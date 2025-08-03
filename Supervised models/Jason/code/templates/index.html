@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Prediction Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .data-requirements {
+            background-color: #e8f4fc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3498db;
+        }
+        .data-requirements h2 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .data-requirements ul {
+            columns: 2;
+            padding-left: 20px;
+        }
+        .data-requirements li {
+            margin-bottom: 5px;
+            break-inside: avoid;
+        }
+        form {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: block;
+            margin: 30px auto 0;
+            width: 200px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .required:after {
+            content: " *";
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Department Prediction Form</h1>
+    
+    <div class="data-requirements">
+        <h2>Data Requirements</h2>
+        <ul>
+            <li><strong>Product Type:</strong> Fragile, Not Fragile</li>
+            <li><strong>Shipping Class:</strong> Standard, 2A, Elite, First Class</li>
+            <li><strong>Customer Category:</strong> Consumer, Corporate, Home Office</li>
+            <li><strong>Customer State:</strong> AR, BR, CA, RJ, UK, UP, US</li>
+            <li><strong>Warehouse Region:</strong> NORTH, SOUTH, EAST, WEST, CENTRAL</li>
+            <li><strong>Price:</strong> $0 - $10,000</li>
+            <li><strong>Quantity:</strong> 1 - 10 units</li>
+        </ul>
+    </div>
+
+    <form action="/predict" method="POST">
+        <!-- Numerical Inputs -->
+        {% for field, specs in data_specs.numerical.items() %}
+        <div class="form-group">
+            <label for="{{ field }}" class="required">{{ field }}:
+                {% if 'min' in specs and 'max' in specs %}
+                ({{ specs.min }}-{{ specs.max }})
+                {% endif %}
+            </label>
+            <input type="number" id="{{ field }}" name="{{ field }}"
+                   {% if 'min' in specs %}min="{{ specs.min }}"{% endif %}
+                   {% if 'max' in specs %}max="{{ specs.max }}"{% endif %}
+                   step="{% if specs.type == float %}0.01{% else %}1{% endif %}"
+                   required>
+        </div>
+        {% endfor %}
+
+        <!-- Categorical Inputs -->
+        {% for field, options in data_specs.categorical.items() %}
+        <div class="form-group">
+            <label for="{{ field }}" class="required">{{ field }}:</label>
+            <select id="{{ field }}" name="{{ field }}" required>
+                {% for option in options %}
+                <option value="{{ option }}">{{ option }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+
+        <button type="submit">Predict Department</button>
+    </form>
+</body>
+</html>
