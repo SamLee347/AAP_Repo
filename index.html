@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Staff Directory</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 30px;
+        }
+        h1 {
+            color: #333;
+            margin: 0;
+        }
+        .staff-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .staff-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        .staff-card:hover {
+            transform: translateY(-5px);
+        }
+        .staff-img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 0 auto 15px;
+            display: block;
+            background-color: #eee;
+        }
+        .staff-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 0 0 5px;
+            text-align: center;
+        }
+        .staff-position {
+            color: #666;
+            text-align: center;
+            margin: 0 0 15px;
+        }
+        .staff-contact {
+            font-size: 0.9rem;
+            color: #444;
+        }
+        .staff-contact p {
+            margin: 5px 0;
+        }
+        @media (max-width: 600px) {
+            .staff-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Our Team</h1>
+        <p>Meet the talented people behind our success</p>
+    </header>
+
+    <div class="staff-container">
+        <!-- Staff Member 1 -->
+        <div class="staff-card">
+            <img src="https://via.placeholder.com/100" alt="Staff Member" class="staff-img">
+            <h2 class="staff-name">John Doe</h2>
+            <p class="staff-position">CEO</p>
+            <div class="staff-contact">
+                <p>✉️ john.doe@company.com</p>
+                <p>📞 (555) 123-4567</p>
+                <p>🏢 Office 101</p>
+            </div>
+        </div>
+
+        <!-- Staff Member 2 -->
+        <div class="staff-card">
+            <img src="https://via.placeholder.com/100" alt="Staff Member" class="staff-img">
+            <h2 class="staff-name">Jane Smith</h2>
+            <p class="staff-position">Marketing Director</p>
+            <div class="staff-contact">
+                <p>✉️ jane.smith@company.com</p>
+                <p>📞 (555) 987-6543</p>
+                <p>🏢 Office 205</p>
+            </div>
+        </div>
+
+        <!-- Staff Member 3 -->
+        <div class="staff-card">
+            <img src="https://via.placeholder.com/100" alt="Staff Member" class="staff-img">
+            <h2 class="staff-name">Alex Johnson</h2>
+            <p class="staff-position">Lead Developer</p>
+            <div class="staff-contact">
+                <p>✉️ alex.johnson@company.com</p>
+                <p>📞 (555) 456-7890</p>
+                <p>🏢 Office 312</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
