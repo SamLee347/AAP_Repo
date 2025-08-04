@@ -1,0 +1,29 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sales Prediction</title>
+</head>
+<body>
+    <h1>Forecast Order Quantity</h1>
+    <form action="/predict" method="post">
+        <label>Order Month:</label><br>
+        <input type="number" name="order_month"><br>
+
+        <label>Product Name:</label><br>
+        <input type="text" name="product_name"><br>
+
+        <label>Order Country:</label><br>
+        <input type="text" name="order_country"><br>
+
+        <label>Customer Segment:</label><br>
+        <input type="text" name="customer_segment"><br>
+
+        <input type="submit" value="Predict">
+    </form>
+
+    {% if prediction %}
+        <h2>Predicted Order Quantity: {{ prediction }}</h2>
+    {% endif %}
+</body>
+</html>
