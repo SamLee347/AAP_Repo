@@ -1,0 +1,19 @@
+
+sqlalchemy library used for database management (needed for chatbot access to data)
+Do 
+-pip install sqlalchemy (sqlalchemy library)
+-pip install mysql-connector-python (extension for mysql handling)
+
+
+Database - configure the database and initialize in app.py
+Models folder - define the entities and rows
+(i made everything into a decoupled format with each entity having one file and all loaded into __init__.py which is called when importing pack)
+
+
+About __init__.py if curious:
+__init__.py is a special Python file that makes a folder a package, basically allows other files to use the classes and functions from the folder, 
+like javascript export module.
+
+
+mysql(username=aap, password=mysql, schema=aap) make sure to create a schema locally if app.py doesnt run due to mysql
+maybe your sql was not created properly works for me(Kendrick)
