@@ -14,24 +14,7 @@ def populate_test_data():
     session.commit()
     session.close()
 
-#Simple query function to get samples by name
-def query_samples_simple(session, name_contains: str = None):
-    query = session.query(Sample)
-    if name_contains:
-        query = query.filter(Sample.name.ilike(f"%{name_contains}%"))
-    return query.all()
 
-@app.route("/samples", methods=["GET"])
-def get_samples():
-    name = request.args.get("name")
-    session = SessionLocal()
-    try:
-        samples = query_samples_simple(session, name)
-        result = [{"id": s.id, "name": s.name, "date": s.date, "description": s.description} for s in samples]
-        return jsonify(result)
-    finally:
-        session.close()
-    
 
 if __name__ == "__main__":
     try:
