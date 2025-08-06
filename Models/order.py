@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 class Order(Base):
     __tablename__ = "Order"
 
-    order_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    item_id: Mapped[int] = mapped_column(ForeignKey("Inventory.item_id"), nullable=False)
+    OrderId: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ItemId: Mapped[int] = mapped_column(ForeignKey("Inventory.ItemId"), nullable=False)
     OrderQuantity: Mapped[int] = mapped_column(Integer, nullable=False)
     Sales: Mapped[int] = mapped_column(Integer, nullable=False)
     Price: Mapped[float] = mapped_column(Float, nullable=False)
