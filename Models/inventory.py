@@ -1,21 +1,23 @@
-from typing import TYPE_CHECKING
-from sqlalchemy import String, Integer, Boolean, ForeignKey
+from typing import TYPE_CHECKING, List
+from sqlalchemy import String, Integer, Boolean, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from Models.base import Base
 
 if TYPE_CHECKING:
-    from Models.sample import Sample
+    from Models.order import Order
 
-# Inventory model to represent inventory items related to samples
+# Inventory model to represent inventory items related to orders
 class Inventory(Base):
-    __tablename__ = "inventory"
+    __tablename__ = "Inventory"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    item_name: Mapped[str] = mapped_column(String(50))
-    capacity: Mapped[int]
-    inventory_level: Mapped[int]
-    demand_forecast: Mapped[int]
-    dispose: Mapped[bool]
-    sample_id: Mapped[int] = mapped_column(ForeignKey("sample.id"))
+    item_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    Date: Mapped[str] = mapped_column(String(10))
+    itemQuantity: Mapped[int] = mapped_column(Integer, nullable=True)
+    UnitsSold: Mapped[int] = mapped_column(Integer, nullable=True)
+    Weight: Mapped[float] = mapped_column(Float, nullable=True)
+    Size: Mapped[float] = mapped_column(Float, nullable=True)
+    Priority: Mapped[str] = mapped_column(String(50))
+    dispose: Mapped[bool] = mapped_column(Boolean, nullable=True)
 
-    sample: Mapped["Sample"] = relationship("Sample", back_populates="inventory")
+    # Defining relationship with Order model
+    orders: Mapped[List["Order"]] = relationship("Order", back_populates="inventory_item")

@@ -1,4 +1,5 @@
+#IMPORTANT ALLOWS FILES TO ACCESS THESE CLASSES
+
 from Models.base import Base
-from Models.sample import Sample
-from Models.forecast_sales import Forecast_Sales
+from Models.order import Order
 from Models.inventory import Inventory
