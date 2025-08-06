@@ -13,6 +13,7 @@ class Inventory(Base):
     item_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     Date: Mapped[str] = mapped_column(String(10))
     itemQuantity: Mapped[int] = mapped_column(Integer, nullable=True)
+    itemCategory: Mapped[str] = mapped_column(String(50), nullable=True)
     UnitsSold: Mapped[int] = mapped_column(Integer, nullable=True)
     Weight: Mapped[float] = mapped_column(Float, nullable=True)
     Size: Mapped[float] = mapped_column(Float, nullable=True)
