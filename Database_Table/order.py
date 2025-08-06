@@ -1,11 +1,11 @@
 from typing import List, TYPE_CHECKING
 from sqlalchemy import String, Float, Integer, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
-from Models.base import Base
+from Database_Table.base import Base
 
 
 if TYPE_CHECKING:
-    from Models.inventory import Inventory
+    from Database_Table.inventory import Inventory
 
 # Sample model to represent a sample with related sales and inventory
 class Order(Base):

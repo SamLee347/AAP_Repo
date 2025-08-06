@@ -1,10 +1,10 @@
 from typing import TYPE_CHECKING, List
 from sqlalchemy import String, Integer, Boolean, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from Models.base import Base
+from Database_Table.base import Base
 
 if TYPE_CHECKING:
-    from Models.order import Order
+    from Database_Table.order import Order
 
 # Inventory model to represent inventory items related to orders
 class Inventory(Base):
