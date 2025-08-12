@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Forecast Prediction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        input:focus, select:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .model-info {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .input-info {
+            background-color: #e2e3e5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📈 Sales Forecast Prediction</h1>
+        
+        {% if model_loaded %}
+            <div class="model-info">
+                ✅ XGBoost Time Series Model Loaded Successfully<br>
+                Available Categories: {{ categories|length }}
+            </div>
+        {% else %}
+            <div class="error">
+                ❌ Model not loaded. Please check if model files exist in the 'model' directory.
+            </div>
+        {% endif %}
+        
+        {% if error %}
+            <div class="error">
+                Error: {{ error }}
+            </div>
+        {% endif %}
+        
+        {% if model_loaded %}
+        <div class="input-info">
+            <strong>📋 Input Parameters:</strong><br>
+            • Select a product category and target month<br>
+            • Model uses your trained XGBoost time series forecaster<br>
+            • Prediction based on R² = 0.9608, MAPE = 87.41%
+        </div>
+        
+        <form method="POST" action="/predict">
+            <div class="form-group">
+                <label for="category">Product Category:</label>
+                <select name="category" id="category" required>
+                    {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="month">Target Month (YYYY-MM):</label>
+                <input type="month" name="month" id="month" value="2025-03" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="product_category_id">Product Category ID:</label>
+                <input type="number" name="product_category_id" id="product_category_id" value="40">
+            </div>
+            
+            <div class="form-group">
+                <label for="avg_price">Average Price ($):</label>
+                <input type="number" name="avg_price" id="avg_price" value="25.50" step="0.01">
+            </div>
+            
+            <div class="form-group">
+                <label for="customer_segment">Customer Segment:</label>
+                <select name="customer_segment" id="customer_segment">
+                    <option value="Consumer">Consumer</option>
+                    <option value="Corporate">Corporate</option>
+                    <option value="Home Office">Home Office</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="discount_rate">Discount Rate (0.00-1.00):</label>
+                <input type="number" name="discount_rate" id="discount_rate" value="0.08" step="0.01" min="0" max="1">
+            </div>
+            
+            <button type="submit" class="btn">🔮 Generate Forecast</button>
+        </form>
+        {% endif %}
+    </div>
+</body>
+</html>
