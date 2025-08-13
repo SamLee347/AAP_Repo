@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 from Database.db import SessionLocal, init_db
 from Database_Table.inventory import Inventory
-
+from GenerativeModels.ChatBot.nlpQuery import query_gemini
 
 app = Flask(__name__)
 
@@ -15,9 +15,14 @@ def populate_test_data():
     session.commit()
     session.close()
 
+def testing_nlpchatbot():
+    question = "How many units of ItemId 101 are in stock?"
+    answer = query_gemini(question)
+    print(answer)
 
 @app.route('/', methods=['GET'])
 def home():
+    testing_nlpchatbot()
     return render_template("index.html", result=None)
 
 if __name__ == "__main__":
@@ -31,4 +36,7 @@ if __name__ == "__main__":
     app.run(debug=True, port=5000)
     print("Flask app running on port 5000")
 
-
+    try:
+        testing_nlpchatbot()
+    except Exception as e:
+        print(f"Error occurred while testing NLP chatbot: {e}")
