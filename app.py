@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from Database.db import SessionLocal, init_db
 from Database_Table.inventory import Inventory
 
@@ -15,6 +15,9 @@ def populate_test_data():
     session.close()
 
 
+@app.route('/', methods=['GET'])
+def home():
+    return render_template("index.html", result=None)
 
 if __name__ == "__main__":
     try:
@@ -26,3 +29,5 @@ if __name__ == "__main__":
         
     app.run(debug=True, port=5000)
     print("Flask app running on port 5000")
+
+
