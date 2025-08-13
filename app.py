@@ -2,13 +2,14 @@ from flask import Flask, request, jsonify, render_template
 from Database.db import SessionLocal, init_db
 from Database_Table.inventory import Inventory
 
+
 app = Flask(__name__)
 
 # Function to populate test data
 def populate_test_data():
     session = SessionLocal()
-    s1 = Inventory(ItemId=1, Date="2025-06-01", itemQuantity=100, UnitsSold=50, Weight=1.5, Size=10.0, Priority="High", dispose=False)
-    s2 = Inventory(ItemId=2, Date="2025-07-01", itemQuantity=200, UnitsSold=100, Weight=2.0, Size=20.0, Priority="Medium", dispose=False)
+    s1 = Inventory(ItemId=1, Date="2025-06-01", ItemQuantity=100, ItemCategory="Electronics", UnitsSold=50, Weight=1.5, Size=10.0, Priority="High", Dispose=False)
+    s2 = Inventory(ItemId=2, Date="2025-07-01", ItemQuantity=200, ItemCategory="Electronics", UnitsSold=100, Weight=2.0, Size=20.0, Priority="Medium", Dispose=False)
 
     session.add_all([s1, s2])
     session.commit()
