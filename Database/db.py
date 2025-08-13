@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from Models import Base
+from Database_Table import Base
 
 # For testing or development
 username = "aap"  #mysql username

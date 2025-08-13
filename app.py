@@ -1,20 +1,23 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from Database.db import SessionLocal, init_db
-from Models.sample import Sample
+from Database_Table.inventory import Inventory
 
 app = Flask(__name__)
 
 # Function to populate test data
 def populate_test_data():
     session = SessionLocal()
-    s1 = Sample(name="Sample A", date="2025-06-01", description="Test Desc")
-    s2 = Sample(name="Sample B", date="2025-07-01", description="Another Desc")
+    s1 = Inventory(ItemId=1, Date="2025-06-01", itemQuantity=100, UnitsSold=50, Weight=1.5, Size=10.0, Priority="High", dispose=False)
+    s2 = Inventory(ItemId=2, Date="2025-07-01", itemQuantity=200, UnitsSold=100, Weight=2.0, Size=20.0, Priority="Medium", dispose=False)
 
     session.add_all([s1, s2])
     session.commit()
     session.close()
 
 
+@app.route('/', methods=['GET'])
+def home():
+    return render_template("index.html", result=None)
 
 if __name__ == "__main__":
     try:
@@ -26,3 +29,5 @@ if __name__ == "__main__":
         
     app.run(debug=True, port=5000)
     print("Flask app running on port 5000")
+
+
