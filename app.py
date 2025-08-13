@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template
 from Database.db import SessionLocal, init_db
 from Database_Table.inventory import Inventory
 
+
 app = Flask(__name__)
 
 # Function to populate test data
