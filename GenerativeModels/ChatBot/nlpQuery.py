@@ -31,6 +31,7 @@ def embed_content(records):
                 f"Weight: {r.Weight}, Size: {r.Size}, Priority: {r.Priority}, "
                 f"Dispose: {r.Dispose}"
             )
+            record_id = r.ItemId
         elif isinstance(r, Order):
             text = (
                 f"OrderId: {r.OrderId}, ItemId: {r.ItemId}, OrderQuantity: {r.OrderQuantity}, "
@@ -38,6 +39,7 @@ def embed_content(records):
                 f"Profit: {r.Profit}, DateOrdered: {r.DateOrdered}, "
                 f"DateReceived: {r.DateReceived}, CustomerSegment: {r.CustomerSegment}"
             )
+            record_id = r.OrderId
         else:
             continue
         
@@ -45,7 +47,7 @@ def embed_content(records):
             model="models/text-embedding-004",
             content=text
         )["embedding"]
-        embeddings_list.append({"id": getattr(r, "ItemId", getattr(r, "OrderId")), "text": text, "embedding": embedding})
+        embeddings_list.append({"id": record_id, "text": text, "embedding": embedding})
     
     return embeddings_list
 
