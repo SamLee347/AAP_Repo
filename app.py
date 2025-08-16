@@ -9,8 +9,8 @@ app = Flask(__name__)
 # Function to populate test data
 def populate_test_data():
     session = SessionLocal()
-    s1 = Inventory(Date="2025-06-01", ItemQuantity=100, ItemCategory="Technology", UnitsSold=50, Weight=1.5, Size=10.0, Priority="High", Dispose=False)
-    s2 = Inventory(Date="2025-07-01", ItemQuantity=200, ItemCategory="Other", UnitsSold=100, Weight=2.0, Size=20.0, Priority="Medium", Dispose=False)
+    s1 = Inventory(Date="2025-06-01", ItemQuantity=100, ItemCategory="Technology", UnitsSold=50, Weight=1.5, Size=10.0, Location="A-1", Priority="High", Dispose=False)
+    s2 = Inventory(Date="2025-07-01", ItemQuantity=200, ItemCategory="Other", UnitsSold=100, Weight=2.0, Size=20.0, Location="B-2", Priority="Medium", Dispose=False)
 
     session.add_all([s1, s2])
     session.commit()
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     try:
         init_db()
         populate_test_data()
-        populate_order_data()
+        populate_order_data() 
         print("Database initialized and test data populated successfully.")
     except Exception as e:
         print(f"Error occurred: {e}: DATABASE NOT INITIALIZED MAYBE DUE TO MYSQL NOT RUNNING")
