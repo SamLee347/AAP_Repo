@@ -9,8 +9,8 @@ app = Flask(__name__)
 # Function to populate test data
 def populate_test_data():
     session = SessionLocal()
-    s1 = Inventory(Date="2025-06-01", ItemQuantity=100, ItemCategory="Technology", UnitsSold=50, Weight=1.5, Size=10.0, Location="A-1", Priority="High", Dispose=False)
-    s2 = Inventory(Date="2025-07-01", ItemQuantity=200, ItemCategory="Other", UnitsSold=100, Weight=2.0, Size=20.0, Location="B-2", Priority="Medium", Dispose=False)
+    s1 = Inventory(ItemName="Laptop", Date="2025-06-01", ItemQuantity=100, ItemCategory="Technology", UnitsSold=50, Weight=1.5, Size=10.0, Location="A-1", Priority="High", Dispose=False)
+    s2 = Inventory(ItemName="Chair", Date="2025-07-01", ItemQuantity=200, ItemCategory="Other", UnitsSold=100, Weight=2.0, Size=20.0, Location="B-2", Priority="Medium", Dispose=False)
 
     session.add_all([s1, s2])
     session.commit()

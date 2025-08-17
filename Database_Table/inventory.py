@@ -11,6 +11,7 @@ class Inventory(Base):
     __tablename__ = "Inventory"
 
     ItemId: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ItemName: Mapped[str] = mapped_column(String(100), nullable=True)
     ItemCategory: Mapped[str] = mapped_column(String(50), nullable=True)
     ItemQuantity: Mapped[int] = mapped_column(Integer, nullable=True)
     UnitsSold: Mapped[int] = mapped_column(Integer, nullable=True)
