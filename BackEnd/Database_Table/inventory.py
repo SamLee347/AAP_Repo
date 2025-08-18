@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 # Inventory model to represent inventory items related to orders
 class Inventory(Base, SerializerMixin):
     __tablename__ = "Inventory"
+    serialize_rules = ("-orders.inventory_item",)
 
     ItemId: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     Date: Mapped[str] = mapped_column(String(10))

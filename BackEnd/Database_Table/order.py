@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 # Sample model to represent a sample with related sales and inventory
 class Order(Base, SerializerMixin):
     __tablename__ = "Order"
+    serialize_rules = ("-inventory_item.orders",)
 
     OrderId: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ItemId: Mapped[int] = mapped_column(ForeignKey("Inventory.ItemId"), nullable=False)
@@ -27,17 +28,3 @@ class Order(Base, SerializerMixin):
     # Inventory items related to this order
     inventory_item: Mapped["Inventory"] = relationship("Inventory", back_populates="orders")
 
-    def to_dict(self):
-        return {
-            "OrderId": self.OrderId,
-            "ItemId": self.ItemId,
-            "OrderQuantity": self.OrderQuantity,
-            "Sales": self.Sales,
-            "Price": self.Price,
-            "Discount": self.Discount,
-            "Profit": self.Profit,
-            "DateOrdered": self.DateOrdered,
-            "DateReceived": self.DateReceived,
-            "CustomerSegment": self.CustomerSegment,
-            "InventoryItem": self.inventory_item.to_dict() if self.inventory_item else None,
-        }
