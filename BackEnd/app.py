@@ -20,9 +20,10 @@ def populate_test_data():
     # Create Inventory test items
     electronics = Inventory(
         ItemId=101,
+        ItemName="Smartphone",
         Date="2025-06-01",
         ItemQuantity=100,
-        ItemCategory="Electronics",
+        ItemCategory="Technology",
         UnitsSold=50,
         Weight=1.5,
         Size=10.0,
@@ -32,6 +33,7 @@ def populate_test_data():
 
     clothing = Inventory(
         ItemId=102,
+        ItemName="T-Shirt",
         Date="2025-07-01",
         ItemQuantity=200,
         ItemCategory="Clothing",
@@ -44,6 +46,7 @@ def populate_test_data():
 
     Clothes = Inventory(
         ItemId=103,
+        ItemName="Winter Jacket",
         Date="2025-08-01",
         ItemQuantity=150,
         ItemCategory="Clothing",
