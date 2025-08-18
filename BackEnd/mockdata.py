@@ -18,11 +18,11 @@ def populate_test_data():
         ItemCategory="Electronics",
         UnitsSold=50,
         Weight=1.5,
-        Size=10.0,
+        Size="Small",
         Priority="High",
         DemandForecast=80,  # Example lag feature
         Dispose=False,
-        Location="Warehouse A",
+        Location="A-1",
     )
 
     clothing = Inventory(
@@ -33,11 +33,11 @@ def populate_test_data():
         ItemCategory="Clothing",
         UnitsSold=100,
         Weight=2.0,
-        Size=20.0,
+        Size="Medium",
         Priority="Medium",
         DemandForecast=150,  # Example lag feature
         Dispose=False,
-        Location="Warehouse B",
+        Location="A-2",
     )
 
     Clothes = Inventory(
@@ -48,11 +48,11 @@ def populate_test_data():
         ItemCategory="Clothing",
         UnitsSold=75,
         Weight=15.0,
-        Size=50.0,
+        Size="Large",
         Priority="Low",
         DemandForecast=20,  # Example lag feature
         Dispose=True,
-        Location="Warehouse C",
+        Location="C-6",
     )
 
     # Create Orders that reference these inventory items

@@ -18,7 +18,7 @@ interface AIResult {
 
 const ENDPOINT_MAP = {
   disposal: "disposal-prediction",
-  storage: "storage-optimization",
+  storage: "predictLocation",
   forecast: "sales-forecast",
   category: "categorization"
 } as const;
@@ -127,14 +127,14 @@ export function AIPanel({ selectedItem }: AIPanelProps) {
                     {tab.id === "storage" && (
                       <>
                         <div className="ai-result-zone">
-                          {results[tab.id].recommended_zone}
+                          {results[tab.id].recommendation}
                         </div>
                         <div className="ai-result-confidence">
                           Confidence: {results[tab.id].confidence}%
                         </div>
                         <div className="ai-result-factors">
                           <div className="ai-result-factors-title">Factors:</div>
-                          {results[tab.id].factors?.map((factor, idx) => (
+                          {results[tab.id].reasons?.map((factor, idx) => (
                             <div key={idx}>• {factor}</div>
                           ))}
                         </div>

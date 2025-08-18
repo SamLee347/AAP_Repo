@@ -110,56 +110,134 @@ def test_chatbot():
 
     return jsonify({"tests": results})
 
-
 @app.route("/predictLocation", methods=["POST"])
 def predict_location():
     """Endpoint to predict the location of an inventory item"""
+    logger.info("Starting location prediction request")
+    session = SessionLocal()
     input_data = request.json
-
-    # Call the AI model for prediction (mocked response here)
-    with open('BackEnd/Supervised_Models/Samuel/storage_prediction_model.pkl', 'rb') as file:
-        storage_prediction_model = pickle.load(file)
-            
-    categorical_features = {
-        'Priority': ['High','Low','Medium'],
-        'Product_Type': ['Clothing','Technology','Other','Sports and Fitness'],
-        'Size': ['Large','Medium','Small']
-    }
-    numerical_features = ['Order_Quantity', 'Weight']
-    one_hot_columns = []
     
-    for feature, values in categorical_features.items():
-        for value in values:
-            one_hot_columns.append(f"{feature}_{value}")
+    try:
+        # Validate input
+        if not input_data or 'item_id' not in input_data:
+            logger.error("Missing item_id in request")
+            return jsonify({"error": "item_id is required"}), 400
+
+        logger.debug(f"Input data received: {input_data}")
+
+        # Database operations
+        logger.info(f"Querying database for item_id: {input_data['item_id']}")
+        item = session.query(Inventory).filter_by(ItemId=input_data['item_id']).first()
+        orders = session.query(Order).filter_by(ItemId=input_data['item_id']).all()
+
+        if not item:
+            logger.warning(f"Item not found: {input_data['item_id']}")
+            return jsonify({"error": "Item not found"}), 404
+
+        logger.info(f"Found item: {item.ItemId} with {len(orders)} orders")
+
+        # Model loading
+        model_path = 'Supervised_Models/Samuel/storage_prediction_model.pkl'
+        logger.info(f"Loading model from: {model_path}")
         
-    # Combine with numerical features to get all feature names
-    all_feature_names = one_hot_columns + numerical_features
+        try:
+            with open(model_path, 'rb') as file:
+                storage_prediction_model = pickle.load(file)
+            logger.debug("Model loaded successfully")
+        except Exception as e:
+            logger.error(f"Model loading failed: {str(e)}")
+            return jsonify({"error": "Model loading failed"}), 500
 
-    features_dict = {col: 0 for col in all_feature_names}
+        # Define all expected features (this should match your training data)
+        # You need to know what features the model was trained with
+        # This is just an example - adjust according to your actual model
+        expected_categories = {
+            'Priority': ['High', 'Low', 'Medium'],
+            'Product_Type': ['Clothing', 'Electronics', 'Home Goods', 'Sports'],
+            'Size': ['Large', 'Medium', 'Small']
+        }
+        
+        expected_numerical = ['Order_Quantity', 'Weight']
+        
+        # Initialize all features to 0
+        features = {}
+        
+        # Set up one-hot encoded features
+        for feature, categories in expected_categories.items():
+            for category in categories:
+                features[f"{feature}_{category}"] = 0
+        
+        # Add numerical features
+        for feature in expected_numerical:
+            features[feature] = 0
+        
+        # Now populate the actual values
+        try:
+            # Set the correct category to 1
+            if hasattr(item, 'Priority') and item.Priority in expected_categories['Priority']:
+                features[f"Priority_{item.Priority}"] = 1
+            
+            if hasattr(item, 'Product_Type') and item.Product_Type in expected_categories['Product_Type']:
+                features[f"Product_Type_{item.Product_Type}"] = 1
+            
+            if hasattr(item, 'Size') and item.Size in expected_categories['Size']:
+                features[f"Size_{item.Size}"] = 1
+            
+            # Set numerical features
+            features['Order_Quantity'] = sum(order.OrderQuantity for order in orders)
+            features['Weight'] = item.Weight
+            
+            # Create feature array in correct order (this must match training)
+            # You might need to save the feature order when training the model
+            feature_names = sorted(features.keys())
+            feature_values = [features[name] for name in feature_names]
+            
+            features_array = np.array(feature_values).reshape(1, -1)
+            logger.debug(f"Final feature array shape: {features_array.shape}")
+            
+        except Exception as e:
+            logger.error(f"Feature processing failed: {str(e)}")
+            return jsonify({"error": "Feature processing failed"}), 500
 
-    # Set one-hot encoded features
-    for feature, values in categorical_features.items():
-        if feature in input_data:
-            selected_value = input_data[feature]
-            one_hot_col = f"{feature}_{selected_value}"
-            if one_hot_col in features_dict:
-                features_dict[one_hot_col] = 1
+        # Prediction
+        logger.info("Making prediction")
+        try:
+            prediction = storage_prediction_model.predict(features_array)
+            probabilities = storage_prediction_model.predict_proba(features_array)[0]
+            class_labels = storage_prediction_model.classes_
+            
+            logger.debug(f"Raw prediction: {prediction}")
+            logger.debug(f"Class probabilities: {probabilities}")
+            
+            prob_dict = {str(label): float(prob) for label, prob in zip(class_labels, probabilities)}
+            logger.info(f"Prediction probabilities: {prob_dict}")
+            
+            response = {
+                "recommendation": str(prediction[0]),
+                "confidence": prob_dict[str(prediction[0])],
+                "reasons": [
+                    f"Priority: {item.Priority}",
+                    f"Total Orders: {len(orders)}",
+                    f"Weight: {item.Weight}"
+                ]
+            }
+            
+            logger.info(f"Successful prediction: {response}")
+            return jsonify(response)
+            
+        except Exception as e:
+            logger.error(f"Prediction failed: {str(e)}")
+            return jsonify({"error": "Prediction failed"}), 500
 
-    # Set numerical features
-    for feature in numerical_features:
-        if feature in input_data:
-            features_dict[feature] = float(input_data[feature])
-    
-    # Convert to array in the correct order
-    features_array = np.array([features_dict[col] for col in all_feature_names]).reshape(1, -1)
-
-    prediction = storage_prediction_model.predict(features_array)
-
-    probabilities = storage_prediction_model.predict_proba(features_array)[0]
-    class_labels = storage_prediction_model.classes_
-    prob_dict = {str(label): float(prob) for label, prob in zip(class_labels, probabilities)}
-
-    return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
+    except Exception as e:
+        logger.exception("Unexpected error in predict_location")
+        return jsonify({"error": "Internal server error"}), 500
+        
+    finally:
+        session.close()
+        logger.info("Database session closed")
+        
+    # return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
 
 @app.route("/")
 def home():

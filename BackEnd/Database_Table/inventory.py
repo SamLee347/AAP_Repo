@@ -36,5 +36,5 @@ class Inventory(Base, SerializerMixin):
             self.UnitsSold,             # Units_Sold
             self.DemandForecast,        # Demand_Forecast (placeholder)
             np.nan,                          # Inventory_Lag_1 (placeholder)
-            (self.UnitsSold / self.ItemQuantity) if self.ItemQuantity > 0 else 0,                     # Turnover_Lag_1 (placeholder)
+            (self.UnitsSold / self.ItemQuantity) if self.ItemQuantity > 0 else 0,    # Turnover_Lag_1 (placeholder)
         ]
