@@ -3,6 +3,9 @@ sqlalchemy library used for database management (needed for chatbot access to da
 ### DO 
 -pip install sqlalchemy (sqlalchemy library)
 -pip install mysql-connector-python (extension for mysql handling)
+# New one to convert data to json to send to frontend
+-pip install sqlalchemy-serializer
+
 
 ### setup
 musername=aap, password=mysql, schema=aap 
