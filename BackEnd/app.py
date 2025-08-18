@@ -7,100 +7,56 @@ from Database.db import SessionLocal, init_db
 from Database_Table.inventory import Inventory
 from Database_Table.order import Order
 from Generative_Models.ChatBot.nlpQuery import query_gemini
+from mockdata import populate_test_data
+import numpy as np
+
+#Supervised Models
+from load_model import DISPOSAL_MODEL, STORAGE_MODEL, FORECAST_MODEL, CATEGORY_MODEL
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
 
+# ======== Supervised Model =========== #
 
-def populate_test_data():
+@app.route('/disposal-prediction', methods=['POST'])
+def disposal_prediction():
+    logger.debug("Request received: %s", request.json)
+    
     session = SessionLocal()
+    try:
+        item = session.query(Inventory).filter_by(ItemId=request.json['item_id']).first()
+        if not item:
+            return jsonify({"error": "Item not found"}), 404
 
-    # Clear existing data (important for testing)
-    session.query(Order).delete()
-    session.query(Inventory).delete()
+        features = item.get_disposal_features()
+        logger.debug("Features shape: %s", np.array(features).shape)
+        
+        model = DISPOSAL_MODEL['model']
+        prediction = model.predict([features])[0]  # Get single prediction
+        proba = model.predict_proba([features])[0] if hasattr(model, 'predict_proba') else None  # Fixed
+        
+        response = {
+            "recommendation": "DISPOSE" if prediction >= DISPOSAL_MODEL['threshold'] else "KEEP",
+            "confidence": float(max(proba)) if proba is not None else None,  # Now safe
+            "reasons": [
+                f"Quantity: {item.ItemQuantity}",
+                f"Sales: {item.UnitsSold}",
+                f"Turnover: {(item.UnitsSold/item.ItemQuantity):.2f}" if item.ItemQuantity else "N/A"
+            ]
+        }
+        return jsonify(response)
+        
+    except Exception as e:
+        logger.exception("Prediction failed")
+        return jsonify({"error": "Prediction service unavailable"}), 500
+    finally:
+        session.close()
+# ====================================== #
 
-    # Create Inventory test items
-    electronics = Inventory(
-        ItemId=101,
-        Date="2025-06-01",
-        ItemQuantity=100,
-        ItemCategory="Electronics",
-        UnitsSold=50,
-        Weight=1.5,
-        Size=10.0,
-        Priority="High",
-        Dispose=False,
-    )
 
-    clothing = Inventory(
-        ItemId=102,
-        Date="2025-07-01",
-        ItemQuantity=200,
-        ItemCategory="Clothing",
-        UnitsSold=100,
-        Weight=2.0,
-        Size=20.0,
-        Priority="Medium",
-        Dispose=False,
-    )
-
-    Clothes = Inventory(
-        ItemId=103,
-        Date="2025-08-01",
-        ItemQuantity=150,
-        ItemCategory="Clothing",
-        UnitsSold=75,
-        Weight=15.0,
-        Size=50.0,
-        Priority="Low",
-        Dispose=True,
-    )
-
-    # Create Orders that reference these inventory items
-    orders = [
-        Order(
-            OrderId=1001,
-            ItemId=101,  # References electronics ItemId
-            OrderQuantity=10,
-            Sales=5000,
-            Price=500,
-            Discount=50,
-            Profit=4500,
-            DateOrdered="2025-06-15",
-            DateReceived="2025-06-20",
-            CustomerSegment="Corporate",
-        ),
-        Order(
-            OrderId=1002,
-            ItemId=102,  # References clothing ItemId
-            OrderQuantity=20,
-            Sales=2000,
-            Price=100,
-            Discount=20,
-            Profit=1980,
-            DateOrdered="2025-07-10",
-            DateReceived="2025-07-12",
-            CustomerSegment="Retail",
-        ),
-        Order(
-            OrderId=1003,
-            ItemId=101,  # References electronics ItemId again
-            OrderQuantity=5,
-            Sales=2500,
-            Price=500,
-            Discount=25,
-            Profit=2475,
-            DateOrdered="2025-08-05",
-            DateReceived="2025-08-10",
-            CustomerSegment="Wholesale",
-        ),
-    ]
-
-    # Add to session and commit
-    session.add_all([electronics, clothing, Clothes])
-    session.add_all(orders)
-    session.commit()
-    session.close()
 
 @app.route("/inventory", methods=["GET"])
 def get_inventory():
@@ -253,3 +209,4 @@ if __name__ == "__main__":
 
     app.run(debug=True, port=5000)
     print("Flask app running on port 5000")
+
