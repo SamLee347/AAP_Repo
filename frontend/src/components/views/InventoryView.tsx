@@ -26,12 +26,17 @@ export function InventoryView({ inventory, selectedItem, onItemSelect }: Invento
         <table className="table">
           <thead>
             <tr>
-              <th>SKU</th>
-              <th>Product</th>
+              <th>Product ID</th>
+              <th>Product Name</th>
               <th>Category</th>
               <th>Stock</th>
+              <th>Total Units Sold</th>
+              <th>Weight (kg)</th>
+              <th>Size (cm)</th>
+              <th>Priority</th>
               <th>Location</th>
               <th>Date Added</th>
+              <th>Dispose?</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -45,28 +50,20 @@ export function InventoryView({ inventory, selectedItem, onItemSelect }: Invento
                 <td>
                   <code className="code-text">{item.ItemId}</code>
                 </td>
-                <td>
-                  <div className="product-info">
-                    
-                    <div className="product-details">
-                      <h4>{item.Priority}</h4>
-                      <p>{item.Size}</p>
-                      <p>{item.Weight} kg</p>
-                    </div>
-                  </div>
-                </td>
+                <td><h4>{item.ItemName}</h4></td>
                 <td>
                   <span className="badge badge-outline">{item.ItemCategory}</span>
                 </td>
-                <td>
-                  <div className="stock-info">
-                    <div>{item.ItemQuantity} units</div>
-                    <div>{item.UnitsSold} sold</div>
-                    <div>{item.Dispose ? "Yes" : "No"}</div>
-                  </div>
-                </td>
+                <td className="font-weight-500">{item.ItemQuantity ?? 0}</td>
+                <td className="font-weight-500">{item.UnitsSold}</td>
+                <td className="font-weight-500">{item.Weight} kg</td>
+                <td className="font-weight-500">{item.Size} cm</td>
+                <td className="font-weight-500">{item.Priority}</td>
                 <td className="font-weight-500">{item.Location}</td>
                 <td className="font-weight-500">{item.Date}</td>
+                <td className="font-weight-500">
+                  <input type="checkbox" checked={item.Dispose ?? false} readOnly />
+                </td>
                 <td>
                   <button className="btn padding-4-8" title="More actions">
                     <MoreHorizontal size={16} />

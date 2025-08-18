@@ -20,11 +20,12 @@ export function OrdersView({ orders, selectedItem, onItemSelect }: OrdersViewPro
           <thead>
             <tr>
               <th>Order ID</th>
-              <th>Customer</th>
-              <th>Items</th>
-              <th>Total</th>
-              <th>Status</th>
-              <th>Date</th>
+              <th>Customer Segment</th>
+              <th>Number of items</th>
+              <th>Total Sales</th>
+              <th>Profit</th>
+              <th>Date Ordered</th>
+              <th>Date Received</th>
             </tr>
           </thead>
           <tbody>
@@ -41,14 +42,13 @@ export function OrdersView({ orders, selectedItem, onItemSelect }: OrdersViewPro
                 <td>{order.OrderQuantity} items</td>
                 <td className="font-weight-500">{order.Sales}</td>
                 <td className="font-weight-500">{order.Profit}</td>
-
-                <td>
-                  {/* <span className={`badge ${order.status === "Shipped" ? "badge-success" : "badge-secondary"}`}>
+                {/* <td>
+                  <span className={`badge ${order.status === "Shipped" ? "badge-success" : "badge-secondary"}`}>
                     {order.status}
-                  </span> */}
-                </td>
+                  </span>
+                </td> */}
                 <td className="font-size-14 color-muted">{order.DateOrdered}</td>
-                <td className="font-size-14 color-muted">{order.DateReceived}</td>
+                <td className="font-size-14 color-muted">{order.DateReceived ? order.DateReceived : "N/A"}</td>
               </tr>
             ))}
           </tbody>
