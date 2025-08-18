@@ -22,7 +22,7 @@ export interface InventoryItem {
   ItemCategory?: string | null
   UnitsSold?: number | null
   Weight?: number | null
-  Size?: number | null
+  Size?: string | null
   Priority: string
   Dispose?: boolean | null
   orders?: Order[]

@@ -5,6 +5,12 @@ from Database.db import SessionLocal, init_db
 from Database_Table.inventory import Inventory
 from Database_Table.order import Order
 from Generative_Models.ChatBot.nlpQuery import query_gemini
+import pickle
+import numpy as np
+import pandas as pd
+import sys
+import os
+
 
 app = Flask(__name__)
 CORS(app)
@@ -27,7 +33,7 @@ def populate_test_data():
         ItemCategory="Technology",
         UnitsSold=50,
         Weight=1.5,
-        Size=10.0,
+        Size="Small",
         Priority="High",
         Dispose=False,
     )
@@ -41,7 +47,7 @@ def populate_test_data():
         ItemCategory="Clothing",
         UnitsSold=100,
         Weight=2.0,
-        Size=20.0,
+        Size="Medium",
         Priority="Medium",
         Dispose=False,
     )
@@ -55,7 +61,7 @@ def populate_test_data():
         ItemCategory="Clothing",
         UnitsSold=75,
         Weight=15.0,
-        Size=50.0,
+        Size="Large",
         Priority="Low",
         Dispose=True,
     )
@@ -153,6 +159,56 @@ def test_chatbot():
 
     return jsonify({"tests": results})
 
+
+@app.route("/predictLocation", methods=["POST"])
+def predict_location():
+    """Endpoint to predict the location of an inventory item"""
+    input_data = request.json
+
+    # Call the AI model for prediction (mocked response here)
+    with open('BackEnd/Supervised_Models/Samuel/storage_prediction_model.pkl', 'rb') as file:
+        storage_prediction_model = pickle.load(file)
+            
+    categorical_features = {
+        'Priority': ['High','Low','Medium'],
+        'Product_Type': ['Clothing','Technology','Other','Sports and Fitness'],
+        'Size': ['Large','Medium','Small']
+    }
+    numerical_features = ['Order_Quantity', 'Weight']
+    one_hot_columns = []
+    
+    for feature, values in categorical_features.items():
+        for value in values:
+            one_hot_columns.append(f"{feature}_{value}")
+        
+    # Combine with numerical features to get all feature names
+    all_feature_names = one_hot_columns + numerical_features
+
+    features_dict = {col: 0 for col in all_feature_names}
+
+    # Set one-hot encoded features
+    for feature, values in categorical_features.items():
+        if feature in input_data:
+            selected_value = input_data[feature]
+            one_hot_col = f"{feature}_{selected_value}"
+            if one_hot_col in features_dict:
+                features_dict[one_hot_col] = 1
+
+    # Set numerical features
+    for feature in numerical_features:
+        if feature in input_data:
+            features_dict[feature] = float(input_data[feature])
+    
+    # Convert to array in the correct order
+    features_array = np.array([features_dict[col] for col in all_feature_names]).reshape(1, -1)
+
+    prediction = storage_prediction_model.predict(features_array)
+
+    probabilities = storage_prediction_model.predict_proba(features_array)[0]
+    class_labels = storage_prediction_model.classes_
+    prob_dict = {str(label): float(prob) for label, prob in zip(class_labels, probabilities)}
+
+    return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
 
 @app.route("/")
 def home():

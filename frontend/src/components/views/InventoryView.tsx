@@ -32,7 +32,7 @@ export function InventoryView({ inventory, selectedItem, onItemSelect }: Invento
               <th>Stock</th>
               <th>Total Units Sold</th>
               <th>Weight (kg)</th>
-              <th>Size (cm)</th>
+              <th>Size</th>
               <th>Priority</th>
               <th>Location</th>
               <th>Date Added</th>
@@ -57,7 +57,7 @@ export function InventoryView({ inventory, selectedItem, onItemSelect }: Invento
                 <td className="font-weight-500">{item.ItemQuantity ?? 0}</td>
                 <td className="font-weight-500">{item.UnitsSold}</td>
                 <td className="font-weight-500">{item.Weight} kg</td>
-                <td className="font-weight-500">{item.Size} cm</td>
+                <td className="font-weight-500">{item.Size}</td>
                 <td className="font-weight-500">{item.Priority}</td>
                 <td className="font-weight-500">{item.Location}</td>
                 <td className="font-weight-500">{item.Date}</td>

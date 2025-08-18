@@ -18,7 +18,7 @@ class Inventory(Base, SerializerMixin):
     ItemQuantity: Mapped[int] = mapped_column(Integer, nullable=True)
     UnitsSold: Mapped[int] = mapped_column(Integer, nullable=True)
     Weight: Mapped[float] = mapped_column(Float, nullable=True)
-    Size: Mapped[float] = mapped_column(Float, nullable=True)
+    Size: Mapped[str] = mapped_column(String(10), nullable=True)
     Priority: Mapped[str] = mapped_column(String(50))
     Location: Mapped[str] = mapped_column(String(100), nullable=True)
     Date: Mapped[str] = mapped_column(String(10))
