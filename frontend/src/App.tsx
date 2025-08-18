@@ -16,6 +16,7 @@ import "./App.css"
 export interface InventoryItem {
   ItemId: number
   Date: string
+  ItemName: string
   ItemQuantity?: number | null
   ItemCategory?: string | null
   UnitsSold?: number | null
@@ -23,7 +24,6 @@ export interface InventoryItem {
   Size?: number | null
   Priority: string
   Dispose?: boolean | null
-  orders?: Order[]
 }
 
 // Order model interface

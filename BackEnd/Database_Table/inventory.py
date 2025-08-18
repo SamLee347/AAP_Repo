@@ -23,6 +23,17 @@ class Inventory(Base, SerializerMixin):
     Location: Mapped[str] = mapped_column(String(100), nullable=True)
     Date: Mapped[str] = mapped_column(String(10))
     Dispose: Mapped[bool] = mapped_column(Boolean, nullable=True)
+    ItemQuantityLastMonth: Mapped[int] = mapped_column(Integer, nullable=True)
 
     # Defining relationship with Order model
     orders: Mapped[List["Order"]] = relationship("Order", back_populates="inventory_item")
+
+    def get_disposal_features(self):
+        return [
+            self.ItemQuantity,          # Inventory_Level
+            (self.UnitsSold / self.ItemQuantity) if self.ItemQuantity > 0 else 0,  # Inventory_Turnover
+            self.UnitsSold,             # Units_Sold
+            0,                          # Demand_Forecast (placeholder)
+            self.ItemQuantityLastMonth,                          # Inventory_Lag_1 (placeholder)
+            (self.UnitsSold / self.ItemQuantity) if self.ItemQuantity > 0 else 0,                     # Turnover_Lag_1 (placeholder)
+        ]

@@ -16,61 +16,46 @@ interface AIResult {
   attributes?: string[]
 }
 
+const ENDPOINT_MAP = {
+  disposal: "disposal-prediction",
+  storage: "storage-optimization",
+  forecast: "sales-forecast",
+  category: "categorization"
+} as const;
+
 interface AIPanelProps {
   selectedItem: InventoryItem | Order
 }
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000"
+const API_BASE_URL = "http://localhost:5000"
 
 export function AIPanel({ selectedItem }: AIPanelProps) {
   const [activeTab, setActiveTab] = useState("disposal")
   const [results, setResults] = useState<Record<string, AIResult>>({})
   const [loading, setLoading] = useState<string | null>(null)
 
-  const callAI = async (endpoint: string, tabKey: string) => {
-    setLoading(tabKey)
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ item_id: selectedItem.ItemId }),
-      })
+  const callAI = async (tabKey: keyof typeof ENDPOINT_MAP) => {
+  setLoading(tabKey);
+  try {
+    const response = await fetch(`${API_BASE_URL}/${ENDPOINT_MAP[tabKey]}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: selectedItem.ItemId }),
+    });
+    console.log("Calling AI endpoint:", ENDPOINT_MAP[tabKey], "with item_id:", selectedItem.ItemId);
+    console.log("Response status:", response.status);
 
-      if (response.ok) {
-        const data = await response.json()
-        setResults((prev) => ({ ...prev, [tabKey]: data }))
-      } else {
-        throw new Error("API not available")
-      }
-    } catch (error) {
-      // Mock responses
-      const mockResponses = {
-        disposal: {
-          recommendation: Math.random() > 0.7 ? "DISPOSE" : "KEEP",
-          confidence: Math.floor(Math.random() * 30) + 70,
-          reasons: ["Stock age: 45 days", "Low turnover rate", "Expiry approaching"],
-        },
-        storage: {
-          recommended_zone: ["Zone A-1", "Zone B-3", "Zone C-2", "Cold Storage"][Math.floor(Math.random() * 4)],
-          confidence: Math.floor(Math.random() * 25) + 75,
-          factors: ["Temperature requirements", "Access frequency", "Space optimization"],
-        },
-        forecast: {
-          next_month: Math.floor(Math.random() * 100) + 50,
-          trend: Math.random() > 0.5 ? "increasing" : "stable",
-          confidence: Math.floor(Math.random() * 20) + 80,
-        },
-        category: {
-          category: ["Premium", "Standard", "Budget", "Seasonal"][Math.floor(Math.random() * 4)],
-          confidence: Math.floor(Math.random() * 20) + 80,
-          attributes: ["High demand", "Premium pricing", "Quality materials"],
-        },
-      }
-      setResults((prev) => ({ ...prev, [tabKey]: mockResponses[tabKey as keyof typeof mockResponses] }))
-    }
-    setLoading(null)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    const data = await response.json();
+    setResults(prev => ({ ...prev, [tabKey]: data })); // Direct use now
+    
+  } catch (error) {
+    console.error("Prediction error:", error);
+  } finally {
+    setLoading(null);
   }
-
+};
   const tabs = [
     { id: "disposal", label: "Disposal", icon: Trash2 },
     { id: "storage", label: "Storage", icon: MapPin },
@@ -113,12 +98,7 @@ export function AIPanel({ selectedItem }: AIPanelProps) {
               </div>
               <div className="card-body">
                 <button
-                  onClick={() =>
-                    callAI(
-                      `${tab.id === "disposal" ? "disposal-prediction" : tab.id === "storage" ? "storage-optimization" : tab.id === "forecast" ? "sales-forecast" : "categorization"}`,
-                      tab.id,
-                    )
-                  }
+                  onClick={() => callAI(tab.id as keyof typeof ENDPOINT_MAP)}
                   disabled={loading === tab.id}
                   className="btn btn-primary mb-3 w-full"
                 >
