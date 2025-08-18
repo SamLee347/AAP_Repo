@@ -30,7 +30,8 @@ export function InventoryView({ inventory, selectedItem, onItemSelect }: Invento
               <th>Product</th>
               <th>Category</th>
               <th>Stock</th>
-              <th>Price</th>
+              <th>Location</th>
+              <th>Date Added</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -60,10 +61,11 @@ export function InventoryView({ inventory, selectedItem, onItemSelect }: Invento
                 <td>
                   <div className="stock-info">
                     <div>{item.ItemQuantity} units</div>
-                    <div>{item.UnitsSold} reserved</div>
+                    <div>{item.UnitsSold} sold</div>
                     <div>{item.Dispose ? "Yes" : "No"}</div>
                   </div>
                 </td>
+                <td className="font-weight-500">{item.Location}</td>
                 <td className="font-weight-500">{item.Date}</td>
                 <td>
                   <button className="btn padding-4-8" title="More actions">
