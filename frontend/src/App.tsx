@@ -15,13 +15,15 @@ import "./App.css"
 // Inventory model interface
 export interface InventoryItem {
   ItemId: number
+  ItemName: string | null
+  Location: string | null
   Date: string
   ItemName: string
   ItemQuantity?: number | null
   ItemCategory?: string | null
   UnitsSold?: number | null
   Weight?: number | null
-  Size?: number | null
+  Size?: string | null
   Priority: string
   Dispose?: boolean | null
 }
