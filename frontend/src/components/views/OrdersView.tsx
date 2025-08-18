@@ -30,22 +30,25 @@ export function OrdersView({ orders, selectedItem, onItemSelect }: OrdersViewPro
           <tbody>
             {orders.map((order) => (
               <tr
-                key={order.id}
-                className={selectedItem?.id === order.id ? "selected" : ""}
+                key={order.OrderId}
+                className={selectedItem?.ItemId === order.OrderId ? "selected" : ""}
                 onClick={() => onItemSelect(order)}
               >
                 <td>
-                  <code className="code-text">{order.id}</code>
+                  <code className="code-text">{order.OrderId}</code>
                 </td>
-                <td className="font-weight-500">{order.customer}</td>
-                <td>{order.items} items</td>
-                <td className="font-weight-500">{order.total}</td>
+                <td className="font-weight-500">{order.CustomerSegment}</td>
+                <td>{order.OrderQuantity} items</td>
+                <td className="font-weight-500">{order.Sales}</td>
+                <td className="font-weight-500">{order.Profit}</td>
+
                 <td>
-                  <span className={`badge ${order.status === "Shipped" ? "badge-success" : "badge-secondary"}`}>
+                  {/* <span className={`badge ${order.status === "Shipped" ? "badge-success" : "badge-secondary"}`}>
                     {order.status}
-                  </span>
+                  </span> */}
                 </td>
-                <td className="font-size-14 color-muted">{order.date}</td>
+                <td className="font-size-14 color-muted">{order.DateOrdered}</td>
+                <td className="font-size-14 color-muted">{order.DateReceived}</td>
               </tr>
             ))}
           </tbody>

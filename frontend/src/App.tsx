@@ -12,24 +12,33 @@ import { useInventoryData } from "./hooks/useInventoryData"
 import "./App.css"
 
 // Types
+// Inventory model interface
 export interface InventoryItem {
-  id: string
-  name: string
-  category: string
-  brand: string
-  price: string
-  stock: number
-  reserved: number
-  image?: string
+  ItemId: number
+  Date: string
+  ItemQuantity?: number | null
+  ItemCategory?: string | null
+  UnitsSold?: number | null
+  Weight?: number | null
+  Size?: number | null
+  Priority: string
+  Dispose?: boolean | null
+  orders?: Order[]
 }
 
+// Order model interface
 export interface Order {
-  id: string
-  customer: string
-  items: number
-  total: string
-  status: string
-  date: string
+  OrderId: number
+  ItemId: number
+  OrderQuantity: number
+  Sales: number
+  Price: number
+  Discount: number
+  Profit: number
+  DateOrdered: string
+  DateReceived: string
+  CustomerSegment: string
+  inventory_item?: InventoryItem
 }
 
 function App() {
@@ -43,11 +52,17 @@ function App() {
     setSelectedItem(item)
   }
 
-  const filteredInventory = inventory.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // 🔑 Updated filtering logic
+  const filteredInventory = inventory.filter((item) => {
+    const term = searchTerm.toLowerCase()
+
+    return (
+      item.ItemId.toString().includes(term) ||
+      (item.ItemCategory?.toLowerCase().includes(term) ?? false) ||
+      (item.Priority?.toLowerCase().includes(term) ?? false) ||
+      (item.Date?.toLowerCase().includes(term) ?? false)
+    )
+  })
 
   if (loading) {
     return (
@@ -76,7 +91,11 @@ function App() {
             )}
 
             {activeView === "orders" && (
-              <OrdersView orders={orders} selectedItem={selectedItem} onItemSelect={handleItemSelect} />
+              <OrdersView
+                orders={orders}
+                selectedItem={selectedItem}
+                onItemSelect={handleItemSelect}
+              />
             )}
 
             {activeView === "chat" && <ChatView />}

@@ -37,32 +37,34 @@ export function InventoryView({ inventory, selectedItem, onItemSelect }: Invento
           <tbody>
             {inventory.map((item) => (
               <tr
-                key={item.id}
-                className={selectedItem?.id === item.id ? "selected" : ""}
+                key={item.ItemId}
+                className={selectedItem?.ItemId === item.ItemId ? "selected" : ""}
                 onClick={() => onItemSelect(item)}
               >
                 <td>
-                  <code className="code-text">{item.id}</code>
+                  <code className="code-text">{item.ItemId}</code>
                 </td>
                 <td>
                   <div className="product-info">
-                    <img src={item.image || "/placeholder.svg"} alt={item.name} className="product-image" />
+                    
                     <div className="product-details">
-                      <h4>{item.name}</h4>
-                      <p>{item.brand}</p>
+                      <h4>{item.Priority}</h4>
+                      <p>{item.Size}</p>
+                      <p>{item.Weight} kg</p>
                     </div>
                   </div>
                 </td>
                 <td>
-                  <span className="badge badge-outline">{item.category}</span>
+                  <span className="badge badge-outline">{item.ItemCategory}</span>
                 </td>
                 <td>
                   <div className="stock-info">
-                    <div>{item.stock} units</div>
-                    <div>{item.reserved} reserved</div>
+                    <div>{item.ItemQuantity} units</div>
+                    <div>{item.UnitsSold} reserved</div>
+                    <div>{item.Dispose ? "Yes" : "No"}</div>
                   </div>
                 </td>
-                <td className="font-weight-500">{item.price}</td>
+                <td className="font-weight-500">{item.Date}</td>
                 <td>
                   <button className="btn padding-4-8" title="More actions">
                     <MoreHorizontal size={16} />

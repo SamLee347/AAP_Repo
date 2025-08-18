@@ -33,7 +33,7 @@ export function AIPanel({ selectedItem }: AIPanelProps) {
       const response = await fetch(`${API_BASE_URL}/api/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ item_id: selectedItem.id }),
+        body: JSON.stringify({ item_id: selectedItem.ItemId }),
       })
 
       if (response.ok) {
@@ -80,10 +80,7 @@ export function AIPanel({ selectedItem }: AIPanelProps) {
 
   return (
     <div className="ai-panel">
-      <div className="ai-panel-header">
-        <h3>AI Analysis</h3>
-        <p>Selected: {"name" in selectedItem ? selectedItem.name : selectedItem.customer}</p>
-      </div>
+
 
       <div className="tabs">
         <div className="tab-list">

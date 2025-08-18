@@ -1,6 +1,7 @@
 from typing import List, TYPE_CHECKING
 from sqlalchemy import String, Float, Integer, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
+from sqlalchemy_serializer import SerializerMixin
 from Database_Table.base import Base
 
 
@@ -8,7 +9,7 @@ if TYPE_CHECKING:
     from Database_Table.inventory import Inventory
 
 # Sample model to represent a sample with related sales and inventory
-class Order(Base):
+class Order(Base, SerializerMixin):
     __tablename__ = "Order"
 
     OrderId: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -25,3 +26,18 @@ class Order(Base):
 
     # Inventory items related to this order
     inventory_item: Mapped["Inventory"] = relationship("Inventory", back_populates="orders")
+
+    def to_dict(self):
+        return {
+            "OrderId": self.OrderId,
+            "ItemId": self.ItemId,
+            "OrderQuantity": self.OrderQuantity,
+            "Sales": self.Sales,
+            "Price": self.Price,
+            "Discount": self.Discount,
+            "Profit": self.Profit,
+            "DateOrdered": self.DateOrdered,
+            "DateReceived": self.DateReceived,
+            "CustomerSegment": self.CustomerSegment,
+            "InventoryItem": self.inventory_item.to_dict() if self.inventory_item else None,
+        }

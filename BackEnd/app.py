@@ -1,3 +1,4 @@
+import sqlalchemy.orm
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from Database.db import SessionLocal, init_db
@@ -99,6 +100,25 @@ def populate_test_data():
     session.commit()
     session.close()
 
+@app.route("/inventory", methods=["GET"])
+def get_inventory():
+    """Endpoint to get all inventory items"""
+    session = SessionLocal()
+    inventory_items = session.query(Inventory).all()
+    result = [item.to_dict() for item in inventory_items]
+    session.close()
+    return jsonify(result)
+
+@app.route("/orders", methods=["GET"])
+def get_orders():
+    """Endpoint to get all orders"""
+    session = SessionLocal()
+    # Eagerly load the inventory_item relationship
+    orders = session.query(Order).options(sqlalchemy.orm.joinedload(Order.inventory_item)).all()
+    # Convert to dict while session is still open
+    result = [order.to_dict() for order in orders]
+    session.close()
+    return jsonify(result)
 
 @app.route("/test-chatbot", methods=["GET"])
 def test_chatbot():
