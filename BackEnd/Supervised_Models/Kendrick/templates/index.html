@@ -1,0 +1,37 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample Usage Prediction</title>
+</head>
+<body>
+    <h2>Enter Feature Values</h2>
+    <form method="post" action="/predict">
+        {% for feature in features %}
+            <label for="{{ feature }}">{{ feature.replace('_', ' ') }}:</label><br>
+            <input type="text" name="{{ feature }}" title="Preidct" value="123"><br><br>
+        {% endfor %}
+        <input type="submit" value="Predict">
+    </form>
+
+    {% if result %}
+        <h3>Prediction: {{ result }}</h3>
+    {% endif %}
+
+    <h2>Enter Feature2 Values</h2>
+    <form method="post" action="/predict">
+        {% for feature in features %}
+            <label for="{{ feature }}">{{ feature.replace('_', ' ') }}:</label><br>
+            <input type="text" name="{{ feature }}" title="Preidct" value="10000"><br><br>
+        {% endfor %}
+        <input type="submit" value="Predict">
+    </form>
+
+    {% if result %}
+        <h3>Prediction: {{ result }}</h3>
+    {% endif %}<h2>Enter Feature Values</h2>
+    
+</body>
+</html>

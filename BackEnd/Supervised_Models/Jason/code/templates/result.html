@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prediction Result</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; line-height: 1.6; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        .result { background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0; }
+        .feature-list { background-color: #f0f0f0; padding: 15px; border-radius: 4px; }
+        .back-btn { background: #2196F3; color: white; padding: 10px 15px; border: none; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 20px; }
+        .back-btn:hover { background: #0b7dda; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Prediction Result</h1>
+        
+        <div class="result">
+            <h2>Storage Section: {{ prediction }}</h2>
+            
+            {% if probabilities %}
+            <h3>Prediction Probabilities:</h3>
+            <ul>
+                {% for class, prob in probabilities.items() %}
+                <li>Class {{ class }}: {{ "%.4f"|format(prob) }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        
+        <div class="feature-list">
+            <h3>Input Features:</h3>
+            <ul>
+                {% for feature, value in features.items() %}
+                <li>{{ feature }}: {{ value }}</li>
+                {% endfor %}
+                <br>
+                <li>Raw Input: {{ raw_input[0] }}</li>
+            </ul>
+        </div>
+        
+        <a href="/" class="back-btn">Make Another Prediction</a>
+    </div>
+</body>
+</html>
+    

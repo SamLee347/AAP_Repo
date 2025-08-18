@@ -13,13 +13,15 @@ class Inventory(Base, SerializerMixin):
     serialize_rules = ("-orders.inventory_item",)
 
     ItemId: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    Date: Mapped[str] = mapped_column(String(10))
-    ItemQuantity: Mapped[int] = mapped_column(Integer, nullable=True)
+    ItemName: Mapped[str] = mapped_column(String(100), nullable=True)
     ItemCategory: Mapped[str] = mapped_column(String(50), nullable=True)
+    ItemQuantity: Mapped[int] = mapped_column(Integer, nullable=True)
     UnitsSold: Mapped[int] = mapped_column(Integer, nullable=True)
     Weight: Mapped[float] = mapped_column(Float, nullable=True)
     Size: Mapped[float] = mapped_column(Float, nullable=True)
     Priority: Mapped[str] = mapped_column(String(50))
+    Location: Mapped[str] = mapped_column(String(100), nullable=True)
+    Date: Mapped[str] = mapped_column(String(10))
     Dispose: Mapped[bool] = mapped_column(Boolean, nullable=True)
 
     # Defining relationship with Order model
