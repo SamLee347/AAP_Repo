@@ -1,4 +1,4 @@
-import sqlalchemy.orm
+from sqlalchemy.orm import joinedload
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from Database.db import SessionLocal, init_db
@@ -42,11 +42,11 @@ def populate_test_data():
         Dispose=False,
     )
 
-    furniture = Inventory(
+    Clothes = Inventory(
         ItemId=103,
         Date="2025-08-01",
         ItemQuantity=150,
-        ItemCategory="Furniture",
+        ItemCategory="Clothing",
         UnitsSold=75,
         Weight=15.0,
         Size=50.0,
@@ -95,7 +95,7 @@ def populate_test_data():
     ]
 
     # Add to session and commit
-    session.add_all([electronics, clothing, furniture])
+    session.add_all([electronics, clothing, Clothes])
     session.add_all(orders)
     session.commit()
     session.close()
@@ -114,7 +114,7 @@ def get_orders():
     """Endpoint to get all orders"""
     session = SessionLocal()
     # Eagerly load the inventory_item relationship
-    orders = session.query(Order).options(sqlalchemy.orm.joinedload(Order.inventory_item)).all()
+    orders = session.query(Order).options(joinedload(Order.inventory_item)).all()
     # Convert to dict while session is still open
     result = [order.to_dict() for order in orders]
     session.close()
