@@ -55,56 +55,25 @@ class ForecastService:
     # --------------------------------------------------------------------------------------
     def semantic_category_mapping(self, category_name: str, gemini_client=None) -> str:
         """
-        Lightweight category mapping - tries Gemini briefly, falls back to keywords
+        Simple category mapping using just Gemini
         """
-        # First try simple keyword matching (fastest)
-        keyword_result = self._keyword_mapping(category_name)
+        if not gemini_client:
+            return "Other"
         
-        # If keyword mapping gives "Other", try Gemini for a smarter guess
-        if keyword_result == "Other" and gemini_client:
-            return self._gemini_semantic_mapping(category_name, gemini_client)
-        
-        return keyword_result
-
-    def _gemini_semantic_mapping(self, category_name: str, gemini_client) -> str:
-        """
-        Simple, lightweight category mapping using passed Gemini client
-        """
         try:
-            # Very short, focused prompt that won't interfere with chat
-            quick_prompt = f"""Map "{category_name}" to: Technology, Sports and Fitness, Clothing, or Other. Answer with just the category name."""
+            prompt = f"Map '{category_name}' to one of: Technology, Sports and Fitness, Clothing, Other. Reply with only the category name."
             
-            # Quick, simple API call using passed client
             response = gemini_client.models.generate_content(
                 model="models/gemini-1.5-flash-latest",
-                contents=quick_prompt
+                contents=prompt
             )
             
             mapped = response.text.strip()
+            valid_categories = ["Technology", "Sports and Fitness", "Clothing", "Other"]
             
-            # Quick validation
-            if mapped in ["Technology", "Sports and Fitness", "Clothing", "Other"]:
-                return mapped
-            else:
-                return "Other"
-                
+            return mapped if mapped in valid_categories else "Other"
+            
         except:
-            return "Other"
-
-    def _keyword_mapping(self, category_name: str) -> str:
-        """
-        Simple keyword-based fallback (very lightweight)
-        """
-        category_lower = category_name.lower()
-        
-        # Simple keyword checks
-        if any(word in category_lower for word in ['tech', 'computer', 'electronic', 'gaming']):
-            return "Technology"
-        elif any(word in category_lower for word in ['sport', 'fitness', 'outdoor', 'athletic']):
-            return "Sports and Fitness"
-        elif any(word in category_lower for word in ['cloth', 'apparel', 'fashion', 'shoe']):
-            return "Clothing"
-        else:
             return "Other"
     # --------------------------------------------------------------------------------------
 
@@ -135,7 +104,7 @@ class ForecastService:
             
             # Calculate insights
             prices = [order.Price for order in orders if order.Price]
-            discount_rates = [order.OrderItemDiscountRate for order in orders if order.OrderItemDiscountRate]
+            discount_rates = [order.Discount / order.Price for order in orders if order.Discount and order.Price]
             segments = [order.CustomerSegment for order in orders if order.CustomerSegment]
             
             insights = {
@@ -150,7 +119,8 @@ class ForecastService:
             return insights
             
         except Exception as e:
-            db.close()
+            if 'db' in locals():
+                db.close()
             print(f"Warning: Could not get historical insights: {e}")
             return {
                 "avg_price": 25.50,
@@ -161,24 +131,17 @@ class ForecastService:
             }
 
     def forecast_category_demand(self, category_name: str, future_year_month: str, 
-                               scenario: str = "standard", aggregation_method: str = "average", gemini_client = None,
-                               **kwargs) -> Dict[str, Any]:
+                               scenario: str = "standard", aggregation_method: str = "average", 
+                               gemini_client=None, **kwargs) -> Dict[str, Any]:
         """
         Single unified forecasting function with database intelligence and scenario support
-        
-        Args:
-            category_name: Product category name (Office Supplies, Technology, Furniture, Sporting)
-            future_year_month: Target month in YYYY-MM format
-            scenario: "conservative", "standard", or "optimistic"
-            aggregation_method: "average", "median", or "recent"
-            **kwargs: Override parameters (avg_price, customer_segment, discount_rate)
         """
         try:
             # Map user category to model category
             mapped_category = self.semantic_category_mapping(category_name, gemini_client)
             
             # Get historical insights for intelligent defaults
-            insights = self.get_historical_insights(category_name)
+            insights = self.get_historical_insights(mapped_category)
             
             # Use historical insights or kwargs for parameters
             avg_price = kwargs.get('avg_price', insights['avg_price'])
@@ -208,7 +171,7 @@ class ForecastService:
             
             for specific_cat in specific_categories:
                 if specific_cat in self.le_category.classes_:
-                    # Create test data using your notebook's exact approach
+                    # Create test data
                     test_data = {
                         'Category Name': specific_cat,
                         'Average Product Price': avg_price,
@@ -223,7 +186,7 @@ class ForecastService:
                         'Year_Trend': future_date.year - self.reference_date.year
                     }
                     
-                    # Create DataFrame and preprocess exactly like your notebook
+                    # Create DataFrame and preprocess
                     test_df = pd.DataFrame([test_data])
                     test_df['Category Name'] = self.le_category.transform(test_df['Category Name'])
                     test_df = pd.get_dummies(test_df, columns=['Customer Segment'], drop_first=True)
@@ -241,7 +204,7 @@ class ForecastService:
             if not valid_predictions:
                 return {
                     "success": False,
-                    "error": f"No valid subcategories found for {category_name}",
+                    "error": f"No valid subcategories found for {category_name} (mapped to {mapped_category})",
                     "total_predicted_demand": 0
                 }
             
@@ -249,7 +212,6 @@ class ForecastService:
             if aggregation_method == "median":
                 final_prediction = np.median(valid_predictions) * len(valid_predictions)
             elif aggregation_method == "recent":
-                # Weight recent predictions more heavily (simple approach)
                 final_prediction = total_prediction * 1.1 if scenario == "optimistic" else total_prediction * 0.9
             else:  # average (default)
                 final_prediction = total_prediction
@@ -257,6 +219,7 @@ class ForecastService:
             return {
                 "success": True,
                 "category": category_name,
+                "mapped_category": mapped_category,
                 "target_month": future_year_month,
                 "scenario": scenario,
                 "total_predicted_demand": round(final_prediction, 2),
@@ -280,6 +243,7 @@ class ForecastService:
             return {
                 "success": False,
                 "error": str(e),
+                "category": category_name,
                 "total_predicted_demand": 0
             }
 
@@ -454,9 +418,9 @@ def create_forecaster(api_key: str) -> GeminiForecaster:
     
     # Get absolute paths to the model files
     backend_dir = Path(__file__).parent.parent.parent
-    model_path = backend_dir / "Supervised models" / "ShernFai" / "model" / "salesforecast(categories).pkl"
-    preprocessor_path = backend_dir / "Supervised models" / "ShernFai" / "model" / "salesforecast_preprocessor.pkl"
-    
+    model_path = backend_dir / "Supervised_Models" / "ShernFai" / "model" / "salesforecast(categories).pkl"
+    preprocessor_path = backend_dir / "Supervised_Models" / "ShernFai" / "model" / "salesforecast_preprocessor.pkl"
+
     return GeminiForecaster(api_key, str(model_path), str(preprocessor_path))
 
 
@@ -518,9 +482,9 @@ if __name__ == "__main__":
         
         # Get absolute paths to the model files
         backend_dir = Path(__file__).parent.parent.parent
-        model_path = backend_dir / "Supervised models" / "ShernFai" / "model" / "salesforecast(categories).pkl"
-        preprocessor_path = backend_dir / "Supervised models" / "ShernFai" / "model" / "salesforecast_preprocessor.pkl"
-        
+        model_path = backend_dir / "Supervised_Models" / "ShernFai" / "model" / "salesforecast(categories).pkl"
+        preprocessor_path = backend_dir / "Supervised_Models" / "ShernFai" / "model" / "salesforecast_preprocessor.pkl"
+
         forecast_service = ForecastService(
             str(model_path),
             str(preprocessor_path)
@@ -559,8 +523,8 @@ if __name__ == "__main__":
         print("\nTroubleshooting:")
         print("1. Make sure your model files exist at:")
         backend_dir = Path(__file__).parent.parent.parent
-        model_path = backend_dir / "Supervised models" / "ShernFai" / "model" / "salesforecast(categories).pkl"
-        preprocessor_path = backend_dir / "Supervised models" / "ShernFai" / "model" / "salesforecast_preprocessor.pkl"
+        model_path = backend_dir / "Supervised_Models" / "ShernFai" / "model" / "salesforecast(categories).pkl"
+        preprocessor_path = backend_dir / "Supervised_Models" / "ShernFai" / "model" / "salesforecast_preprocessor.pkl"
         print(f"   - {model_path}")
         print(f"   - {preprocessor_path}")
         print("2. Install required dependencies: pip install google-genai")

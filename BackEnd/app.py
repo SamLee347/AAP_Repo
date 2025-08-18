@@ -1,6 +1,8 @@
+import os
 from sqlalchemy.orm import joinedload
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+from Generative_Models.ChatBot.unifiedChatbot import create_unified_chatbot
 from Database.db import SessionLocal, init_db
 from Database_Table.inventory import Inventory
 from Database_Table.order import Order
@@ -238,6 +240,92 @@ def predict_location():
         logger.info("Database session closed")
         
     # return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
+
+# CHATBOT BACKEND
+# ---------------------------------------------------------------------------
+try:
+    API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw')
+    unified_chatbot = create_unified_chatbot(API_KEY)
+    print("✅ Unified chatbot initialized successfully")
+except Exception as e:
+    print(f"❌ Error initializing unified chatbot: {e}")
+    unified_chatbot = None
+
+# ... existing routes ...
+@app.route("/chat", methods=["POST", "GET"])
+def unified_chat_endpoint():
+    """Single endpoint for ALL chatbot functionality with intent recognition"""
+    if request.method == "GET":
+        # Serve the chat interface
+        return render_template('chat.html')
+    
+    try:
+        if not unified_chatbot:
+            return jsonify({
+                "success": False,
+                "error": "Chatbot service not available",
+                "response": "Sorry, the AI assistant is currently unavailable. Please try again later."
+            }), 503
+        
+        data = request.get_json()
+        
+        if not data or 'message' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing message in request",
+                "response": "Please provide a message to process."
+            }), 400
+        
+        user_message = data['message'].strip()
+        
+        if not user_message:
+            return jsonify({
+                "success": False,
+                "error": "Empty message",
+                "response": "Please enter a valid question."
+            }), 400
+        
+        # Let the unified chatbot handle EVERYTHING - it will determine intent automatically
+        response = unified_chatbot.chat_with_unified_intelligence(user_message)
+        
+        # Simple, clean response
+        return jsonify({
+            "success": True,
+            "message": user_message,
+            "response": response,
+            "timestamp": datetime.now().isoformat(),
+            "chatbot_type": "unified_intelligence"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "response": f"An error occurred while processing your request: {str(e)}"
+        }), 500
+
+@app.route("/chat/status", methods=["GET"])
+def chat_status():
+    """Simple status check endpoint"""
+    return jsonify({
+        "success": True,
+        "chatbot_available": unified_chatbot is not None,
+        "capabilities": [
+            "Demand Forecasting",
+            "Trend Analysis", 
+            "Database Querying",
+            "Business Intelligence"
+        ],
+        "example_queries": [
+            "Forecast Technology demand for March 2025",
+            "Which categories are declining?",
+            "Show me recent orders for electronics",
+            "What's our best selling category?",
+            "Predict Office Supplies with optimistic scenario"
+        ]
+    })
+# ---------------------------------------------------------------------------
+
 
 @app.route("/")
 def home():
