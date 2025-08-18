@@ -209,7 +209,7 @@ class ForecastService:
             return "Other"
 
 
-        def get_historical_insights(self, category_name: str, months_back: int = 6) -> Dict[str, Any]:
+    def get_historical_insights(self, category_name: str, months_back: int = 6) -> Dict[str, Any]:
         """Get historical data insights for intelligent parameter defaults"""
         try:
             db = SessionLocal()
