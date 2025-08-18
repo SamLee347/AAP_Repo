@@ -319,6 +319,8 @@ class GeminiForecaster:
                     "required": ["category_name", "future_year_month"]
                 }
             },
+            
+            # Declining Categories
             {
                 "name": "identify_declining_categories",
                 "description": "Identifies categories with declining demand trends based on historical data.",
@@ -343,6 +345,8 @@ class GeminiForecaster:
                     }
                 }
             },
+            
+            # Most Used Categories
             {
                 "name": "get_most_used_category",
                 "description": "Returns the most used category within a given time period with statistical backing.",
@@ -475,3 +479,29 @@ def test_forecasting_queries():
 
 if __name__ == "__main__":
     test_forecasting_queries()
+def generate():
+    client = genai.Client(api_key="AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw")
+    model = "gemini-2.5-flash"
+    contents = [
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(text="""Write me a short poem about coffee."""),
+            ],
+        ),
+    ]
+    generate_content_config = types.GenerateContentConfig(
+        thinking_config = types.ThinkingConfig(
+            thinking_budget=-1,
+        ),
+    )
+
+    for chunk in client.models.generate_content_stream(
+        model=model,
+        contents=contents,
+        config=generate_content_config,
+    ):
+        print(chunk.text, end="")
+
+if __name__ == "__main__":
+    generate()
