@@ -1,3 +1,4 @@
+import datetime
 import os
 from sqlalchemy.orm import joinedload
 from flask import Flask, request, jsonify, render_template
@@ -219,7 +220,7 @@ def predict_location():
                 "confidence": prob_dict[str(prediction[0])],
                 "reasons": [
                     f"Priority: {item.Priority}",
-                    f"Total Orders: {len(orders)}",
+                  f"Total Orders: {len(orders)}",
                     f"Weight: {item.Weight}"
                 ]
             }
@@ -293,7 +294,7 @@ def unified_chat_endpoint():
             "success": True,
             "message": user_message,
             "response": response,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.datetime.now().isoformat(),
             "chatbot_type": "unified_intelligence"
         })
         
