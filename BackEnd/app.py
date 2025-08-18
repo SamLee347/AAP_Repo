@@ -37,7 +37,7 @@ def disposal_prediction():
         proba = model.predict_proba([features])[0] if hasattr(model, 'predict_proba') else None  # Fixed
         
         response = {
-            "recommendation": "DISPOSE" if prediction ==1 else "KEEP",
+            "recommendation": "DISPOSE" if prediction >= DISPOSAL_MODEL['threshold'] else "KEEP",
             "confidence": float(max(proba)) if proba is not None else None,  # Now safe
             "reasons": [
                 f"Quantity: {item.ItemQuantity}",

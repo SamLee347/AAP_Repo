@@ -20,7 +20,7 @@ def populate_test_data():
         Weight=1.5,
         Size=10.0,
         Priority="High",
-        ItemQuantityLastMonth=80,  # Example lag feature
+        DemandForecast=80,  # Example lag feature
         Dispose=False,
         Location="Warehouse A",
     )
@@ -35,7 +35,7 @@ def populate_test_data():
         Weight=2.0,
         Size=20.0,
         Priority="Medium",
-        ItemQuantityLastMonth=150,  # Example lag feature
+        DemandForecast=150,  # Example lag feature
         Dispose=False,
         Location="Warehouse B",
     )
@@ -50,7 +50,7 @@ def populate_test_data():
         Weight=15.0,
         Size=50.0,
         Priority="Low",
-        ItemQuantityLastMonth=20,  # Example lag feature
+        DemandForecast=20,  # Example lag feature
         Dispose=True,
         Location="Warehouse C",
     )
