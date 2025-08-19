@@ -108,7 +108,7 @@ class DatabaseQueryService:
     
     def query_database(self, question: str, top_k: int = 5, session=None) -> Dict[str, Any]:
         """Query database - NOW accepts optional session"""
-        try:
+        try:    
             # Embed the question
             query_emb = np.array(genai_legacy.embed_content(
                 model=self.embedding_model, 
