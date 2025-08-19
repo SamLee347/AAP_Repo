@@ -22,6 +22,9 @@ import numpy as np
 import pandas as pd
 import sys
 import os
+from pathlib import Path
+
+MODEL_DIR = Path(__file__).parent / "Supervised_Models"
 
 
 
@@ -138,13 +141,9 @@ def predict_location():
             return jsonify({"error": "Item not found"}), 404
 
         logger.info(f"Found item: {item.ItemId} with {len(orders)} orders")
-
-        # Model loading
-        model_path = 'Supervised_Models/Samuel/storage_prediction_model.pkl'
-        logger.info(f"Loading model from: {model_path}")
         
         try:
-            with open(model_path, 'rb') as file:
+            with open(MODEL_DIR / "Samuel/storage_prediction_model.pkl", 'rb') as file:
                 storage_prediction_model = pickle.load(file)
             logger.debug("Model loaded successfully")
         except Exception as e:
