@@ -12,9 +12,16 @@ from mockdata import populate_test_data
 from datetime import datetime
 import numpy as np
 
-#Supervised Models
-from load_model import DISPOSAL_MODEL, STORAGE_MODEL, FORECAST_MODEL, CATEGORY_MODEL, REPORT_GENERATION_MODEL
+# Supervised Models
+from load_model import (
+    DISPOSAL_MODEL,
+    STORAGE_MODEL,
+    FORECAST_MODEL,
+    CATEGORY_MODEL,
+    REPORT_GENERATION_MODEL,
+)
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -28,8 +35,8 @@ from pathlib import Path
 MODEL_DIR = Path(__file__).parent / "Supervised_Models"
 
 
-#Gen-ai
-API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw')
+# Gen-ai
+API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw")
 unified_chatbot = None
 
 app = Flask(__name__)
@@ -37,39 +44,54 @@ CORS(app)
 
 # ======== Supervised Model =========== #
 
-@app.route('/disposal-prediction', methods=['POST'])
+
+@app.route("/disposal-prediction", methods=["POST"])
 def disposal_prediction():
     logger.debug("Request received: %s", request.json)
-    
+
     session = SessionLocal()
     try:
-        item = session.query(Inventory).filter_by(ItemId=request.json['item_id']).first()
+        item = (
+            session.query(Inventory).filter_by(ItemId=request.json["item_id"]).first()
+        )
         if not item:
             return jsonify({"error": "Item not found"}), 404
 
         features = item.get_disposal_features()
         logger.debug("Features shape: %s", np.array(features).shape)
-        
-        model = DISPOSAL_MODEL['model']
+
+        model = DISPOSAL_MODEL["model"]
         prediction = model.predict([features])[0]  # Get single prediction
-        proba = model.predict_proba([features])[0] if hasattr(model, 'predict_proba') else None  # Fixed
-        
+        proba = (
+            model.predict_proba([features])[0]
+            if hasattr(model, "predict_proba")
+            else None
+        )  # Fixed
+
         response = {
-            "recommendation": "DISPOSE" if prediction >= DISPOSAL_MODEL['threshold'] else "KEEP",
+            "recommendation": (
+                "DISPOSE" if prediction >= DISPOSAL_MODEL["threshold"] else "KEEP"
+            ),
             "confidence": float(max(proba)) if proba is not None else None,  # Now safe
             "reasons": [
                 f"Quantity: {item.ItemQuantity}",
                 f"Sales: {item.UnitsSold}",
-                f"Turnover: {(item.UnitsSold/item.ItemQuantity):.2f}" if item.ItemQuantity else "N/A"
-            ]
+                (
+                    f"Turnover: {(item.UnitsSold/item.ItemQuantity):.2f}"
+                    if item.ItemQuantity
+                    else "N/A"
+                ),
+            ],
         }
         return jsonify(response)
-        
+
     except Exception as e:
         logger.exception("Prediction failed")
         return jsonify({"error": "Prediction service unavailable"}), 500
     finally:
         session.close()
+
+
 # ====================================== #
 
 
@@ -81,6 +103,7 @@ def get_inventory():
     result = [item.to_dict() for item in inventory_items]
     session.close()
     return jsonify(result)
+
 
 @app.route("/orders", methods=["GET"])
 def get_orders():
@@ -94,17 +117,16 @@ def get_orders():
     return jsonify(result)
 
 
-
 @app.route("/predictLocation", methods=["POST"])
 def predict_location():
     """Endpoint to predict the location of an inventory item"""
     logger.info("Starting location prediction request")
     session = SessionLocal()
     input_data = request.json
-    
+
     try:
         # Validate input
-        if not input_data or 'item_id' not in input_data:
+        if not input_data or "item_id" not in input_data:
             logger.error("Missing item_id in request")
             return jsonify({"error": "item_id is required"}), 400
 
@@ -112,17 +134,17 @@ def predict_location():
 
         # Database operations
         logger.info(f"Querying database for item_id: {input_data['item_id']}")
-        item = session.query(Inventory).filter_by(ItemId=input_data['item_id']).first()
-        orders = session.query(Order).filter_by(ItemId=input_data['item_id']).all()
+        item = session.query(Inventory).filter_by(ItemId=input_data["item_id"]).first()
+        orders = session.query(Order).filter_by(ItemId=input_data["item_id"]).all()
 
         if not item:
             logger.warning(f"Item not found: {input_data['item_id']}")
             return jsonify({"error": "Item not found"}), 404
 
         logger.info(f"Found item: {item.ItemId} with {len(orders)} orders")
-        
+
         try:
-            with open(MODEL_DIR / "Samuel/storage_prediction_model.pkl", 'rb') as file:
+            with open(MODEL_DIR / "Samuel/storage_prediction_model.pkl", "rb") as file:
                 storage_prediction_model = pickle.load(file)
             logger.debug("Model loaded successfully")
         except Exception as e:
@@ -133,49 +155,55 @@ def predict_location():
         # You need to know what features the model was trained with
         # This is just an example - adjust according to your actual model
         expected_categories = {
-            'Priority': ['High', 'Low', 'Medium'],
-            'Product_Type': ['Clothing', 'Electronics', 'Home Goods', 'Sports'],
-            'Size': ['Large', 'Medium', 'Small']
+            "Priority": ["High", "Low", "Medium"],
+            "Product_Type": ["Clothing", "Electronics", "Home Goods", "Sports"],
+            "Size": ["Large", "Medium", "Small"],
         }
-        
-        expected_numerical = ['Order_Quantity', 'Weight']
-        
+
+        expected_numerical = ["Order_Quantity", "Weight"]
+
         # Initialize all features to 0
         features = {}
-        
+
         # Set up one-hot encoded features
         for feature, categories in expected_categories.items():
             for category in categories:
                 features[f"{feature}_{category}"] = 0
-        
+
         # Add numerical features
         for feature in expected_numerical:
             features[feature] = 0
-        
+
         # Now populate the actual values
         try:
             # Set the correct category to 1
-            if hasattr(item, 'Priority') and item.Priority in expected_categories['Priority']:
+            if (
+                hasattr(item, "Priority")
+                and item.Priority in expected_categories["Priority"]
+            ):
                 features[f"Priority_{item.Priority}"] = 1
-            
-            if hasattr(item, 'Product_Type') and item.Product_Type in expected_categories['Product_Type']:
+
+            if (
+                hasattr(item, "Product_Type")
+                and item.Product_Type in expected_categories["Product_Type"]
+            ):
                 features[f"Product_Type_{item.Product_Type}"] = 1
-            
-            if hasattr(item, 'Size') and item.Size in expected_categories['Size']:
+
+            if hasattr(item, "Size") and item.Size in expected_categories["Size"]:
                 features[f"Size_{item.Size}"] = 1
-            
+
             # Set numerical features
-            features['Order_Quantity'] = sum(order.OrderQuantity for order in orders)
-            features['Weight'] = item.Weight
-            
+            features["Order_Quantity"] = sum(order.OrderQuantity for order in orders)
+            features["Weight"] = item.Weight
+
             # Create feature array in correct order (this must match training)
             # You might need to save the feature order when training the model
             feature_names = sorted(features.keys())
             feature_values = [features[name] for name in feature_names]
-            
+
             features_array = np.array(feature_values).reshape(1, -1)
             logger.debug(f"Final feature array shape: {features_array.shape}")
-            
+
         except Exception as e:
             logger.error(f"Feature processing failed: {str(e)}")
             return jsonify({"error": "Feature processing failed"}), 500
@@ -186,26 +214,29 @@ def predict_location():
             prediction = storage_prediction_model.predict(features_array)
             probabilities = storage_prediction_model.predict_proba(features_array)[0]
             class_labels = storage_prediction_model.classes_
-            
+
             logger.debug(f"Raw prediction: {prediction}")
             logger.debug(f"Class probabilities: {probabilities}")
-            
-            prob_dict = {str(label): float(prob) for label, prob in zip(class_labels, probabilities)}
+
+            prob_dict = {
+                str(label): float(prob)
+                for label, prob in zip(class_labels, probabilities)
+            }
             logger.info(f"Prediction probabilities: {prob_dict}")
-            
+
             response = {
                 "recommendation": str(prediction[0]),
                 "confidence": prob_dict[str(prediction[0])],
                 "reasons": [
                     f"Priority: {item.Priority}",
-                  f"Total Orders: {len(orders)}",
-                    f"Weight: {item.Weight}"
-                ]
+                    f"Total Orders: {len(orders)}",
+                    f"Weight: {item.Weight}",
+                ],
             }
-            
+
             logger.info(f"Successful prediction: {response}")
             return jsonify(response)
-            
+
         except Exception as e:
             logger.error(f"Prediction failed: {str(e)}")
             return jsonify({"error": "Prediction failed"}), 500
@@ -213,12 +244,14 @@ def predict_location():
     except Exception as e:
         logger.exception("Unexpected error in predict_location")
         return jsonify({"error": "Internal server error"}), 500
-        
+
     finally:
         session.close()
         logger.info("Database session closed")
-        
+
     # return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
+
+
 # GENERATIVE MODELS
 # REPORT GENERATION
 # ---------------------------------------------------------------------------
@@ -226,10 +259,11 @@ def predict_location():
 def generate_report():
     return REPORT_GENERATION_MODEL()
 
+
 # CHATBOT BACKEND
 # ---------------------------------------------------------------------------
 try:
-    API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw')
+    API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw")
     unified_chatbot = create_unified_chatbot(API_KEY)
     print("✅ Unified chatbot initialized successfully")
 except Exception as e:
@@ -253,67 +287,78 @@ def initialize_chatbot():
         unified_chatbot = None
         return False
 
+
 # CHATBOT ROUTES
 @app.route("/chat", methods=["POST", "GET"])
 def unified_chat_endpoint():
     """Single endpoint for ALL chatbot functionality"""
     global unified_chatbot
-    
+
     logger.info(f"=== CHAT ENDPOINT CALLED ===")
-    
+
     if request.method == "GET":
-        return jsonify({
-            "message": "Chat endpoint is ready. Send POST requests with 'message' field.",
-            "status": "ready",
-            "chatbot_available": unified_chatbot is not None
-        })
-    
+        return jsonify(
+            {
+                "message": "Chat endpoint is ready. Send POST requests with 'message' field.",
+                "status": "ready",
+                "chatbot_available": unified_chatbot is not None,
+            }
+        )
+
     try:
         # Initialize chatbot if needed
         if unified_chatbot is None:
             if not initialize_chatbot():
-                return jsonify({
-                    "success": False,
-                    "response": "Chatbot service is currently unavailable."
-                }), 503
-        
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "response": "Chatbot service is currently unavailable.",
+                        }
+                    ),
+                    503,
+                )
+
         data = request.get_json()
-        if not data or 'message' not in data:
-            return jsonify({
-                "success": False,
-                "response": "Please provide a message."
-            }), 400
-        
-        user_message = data['message'].strip()
+        if not data or "message" not in data:
+            return (
+                jsonify({"success": False, "response": "Please provide a message."}),
+                400,
+            )
+
+        user_message = data["message"].strip()
         if not user_message:
-            return jsonify({
-                "success": False,
-                "response": "Please enter a valid question."
-            }), 400
-        
+            return (
+                jsonify(
+                    {"success": False, "response": "Please enter a valid question."}
+                ),
+                400,
+            )
+
         logger.info(f"Processing message: '{user_message}'")
-        
+
         # Get response from unified chatbot
         logger.info("=== CALLING CHATBOT ===")
         response = unified_chatbot.chat_with_unified_intelligence(user_message)
         logger.info("=== CHATBOT CALL COMPLETED ===")
-        
+
         # Debug the response
         logger.info(f"Response type: {type(response)}")
         logger.info(f"Response length: {len(str(response)) if response else 'None'}")
-        
+
         # Check if response is serializable
         try:
             import json
+
             # Try to serialize the response
             json_test = json.dumps(str(response))
             logger.info("✅ Response is JSON serializable")
         except Exception as json_error:
             logger.error(f"❌ Response not JSON serializable: {json_error}")
             # Clean the response
-            response = str(response).encode('utf-8', errors='ignore').decode('utf-8')
+            response = str(response).encode("utf-8", errors="ignore").decode("utf-8")
             logger.info("🔧 Cleaned response for JSON compatibility")
-        
+
         # Test datetime creation
         try:
             timestamp = datetime.now().isoformat()  # ← This line fails
@@ -329,71 +374,92 @@ def unified_chat_endpoint():
                 "success": True,
                 "message": user_message,
                 "response": str(response),  # Ensure it's a string
-                "timestamp": timestamp
+                "timestamp": timestamp,
             }
             logger.info("✅ Response data structure created")
-            
+
             # Test JSON serialization of the full response
             test_json = json.dumps(response_data)
             logger.info("✅ Full response is JSON serializable")
-            
+
             logger.info("=== RETURNING RESPONSE ===")
             return jsonify(response_data)
-            
+
         except Exception as build_error:
             logger.error(f"❌ Error building response: {build_error}")
-   
-            
+
             # Return a safe fallback response
-            return jsonify({
-                "success": False,
-                "response": "I processed your request but encountered an error formatting the response. Please try again."
-            }), 500
-        
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "response": "I processed your request but encountered an error formatting the response. Please try again.",
+                    }
+                ),
+                500,
+            )
+
     except Exception as e:
         logger.error(f"❌ MAIN ERROR: {e}")
-  
-        return jsonify({
-            "success": False,
-            "response": f"Sorry, I encountered an error: {str(e)}"
-        }), 500
+
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "response": f"Sorry, I encountered an error: {str(e)}",
+                }
+            ),
+            500,
+        )
+
 
 @app.route("/chat/status", methods=["GET"])
 def chat_status():
-    return jsonify({
-        "success": True,
-        "chatbot_available": unified_chatbot is not None,
-        "capabilities": ["Demand Forecasting", "Trend Analysis", "Database Querying"]
-    })
+    return jsonify(
+        {
+            "success": True,
+            "chatbot_available": unified_chatbot is not None,
+            "capabilities": [
+                "Demand Forecasting",
+                "Trend Analysis",
+                "Database Querying",
+            ],
+        }
+    )
+
 
 @app.route("/chat/test", methods=["GET"])
 def test_chat():
     test_message = "What categories do you have?"
-    
+
     try:
         if unified_chatbot is None:
             initialize_chatbot()
-        
+
         if unified_chatbot:
             response = unified_chatbot.chat_with_unified_intelligence(test_message)
-            return jsonify({
-                "test_message": test_message,
-                "response": response,
-                "status": "success"
-            })
+            return jsonify(
+                {
+                    "test_message": test_message,
+                    "response": response,
+                    "status": "success",
+                }
+            )
         else:
-            return jsonify({
-                "test_message": test_message,
-                "response": "Chatbot not available",
-                "status": "failed"
-            })
+            return jsonify(
+                {
+                    "test_message": test_message,
+                    "response": "Chatbot not available",
+                    "status": "failed",
+                }
+            )
     except Exception as e:
-        return jsonify({
-            "test_message": test_message,
-            "response": str(e),
-            "status": "error"
-        })
-#=======================================================================================#
+        return jsonify(
+            {"test_message": test_message, "response": str(e), "status": "error"}
+        )
+
+
+# =======================================================================================#
 # CHATBOT INITIALIZATION - End
 
 
@@ -414,4 +480,3 @@ if __name__ == "__main__":
 
     app.run(debug=True, port=5000)
     print("Flask app running on port 5000")
-
