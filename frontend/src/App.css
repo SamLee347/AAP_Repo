@@ -95,11 +95,13 @@ body {
 /* Layout */
 .main-layout {
   display: flex;
+  height: 100vh;
 }
 
 .content-layout {
   flex: 1;
   display: flex;
+  max-height: 100%;
 }
 
 .main-content {
@@ -387,7 +389,7 @@ body {
 
 /* Chat */
 .chat-container {
-  height: 384px;
+  height: 60vh;
   border: 1px solid #dee2e6;
   border-radius: 8px;
   padding: 16px;

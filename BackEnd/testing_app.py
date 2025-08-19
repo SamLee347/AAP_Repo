@@ -1,8 +1,8 @@
 import os
-from datetime import datetime  # ADD THIS MISSING IMPORT
 from sqlalchemy.orm import joinedload
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+from datetime import datetime
 from Generative_Models.ChatBot.unifiedChatbot import create_unified_chatbot
 from Database.db import SessionLocal, init_db
 from Database_Table.inventory import Inventory
@@ -10,12 +10,19 @@ from Database_Table.order import Order
 from Generative_Models.ChatBot.nlpQuery import query_gemini
 from mockdata import populate_test_data
 import numpy as np
+import pickle
 
 #Supervised Models
 from load_model import DISPOSAL_MODEL, STORAGE_MODEL, FORECAST_MODEL, CATEGORY_MODEL
 import logging
-logging.basicConfig(level=logging.DEBUG)
+import traceback
+import json
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
+
 
 app = Flask(__name__)
 CORS(app)
@@ -255,6 +262,8 @@ def unified_chat_endpoint():
     """Single endpoint for ALL chatbot functionality"""
     global unified_chatbot
     
+    logger.info(f"=== CHAT ENDPOINT CALLED ===")
+    
     if request.method == "GET":
         return jsonify({
             "message": "Chat endpoint is ready. Send POST requests with 'message' field.",
@@ -285,18 +294,68 @@ def unified_chat_endpoint():
                 "response": "Please enter a valid question."
             }), 400
         
-        # Get response from unified chatbot
-        response = unified_chatbot.chat_with_unified_intelligence(user_message)
+        logger.info(f"Processing message: '{user_message}'")
         
-        return jsonify({
-            "success": True,
-            "message": user_message,
-            "response": response,
-            "timestamp": datetime.now().isoformat()
-        })
+        # Get response from unified chatbot
+        logger.info("=== CALLING CHATBOT ===")
+        response = unified_chatbot.chat_with_unified_intelligence(user_message)
+        logger.info("=== CHATBOT CALL COMPLETED ===")
+        
+        # Debug the response
+        logger.info(f"Response type: {type(response)}")
+        logger.info(f"Response length: {len(str(response)) if response else 'None'}")
+        
+        # Check if response is serializable
+        try:
+            import json
+            # Try to serialize the response
+            json_test = json.dumps(str(response))
+            logger.info("✅ Response is JSON serializable")
+        except Exception as json_error:
+            logger.error(f"❌ Response not JSON serializable: {json_error}")
+            # Clean the response
+            response = str(response).encode('utf-8', errors='ignore').decode('utf-8')
+            logger.info("🔧 Cleaned response for JSON compatibility")
+        
+        # Test datetime creation
+        try:
+            timestamp = datetime.now().isoformat()  # ← This line fails
+            logger.info(f"✅ Timestamp created: {timestamp}")
+        except Exception as dt_error:
+            logger.error(f"❌ Datetime error: {dt_error}")
+            timestamp = "2025-08-19T19:43:00"  # Fallback timestamp
+
+        # Build response step by step
+        logger.info("=== BUILDING RESPONSE ===")
+        try:
+            response_data = {
+                "success": True,
+                "message": user_message,
+                "response": str(response),  # Ensure it's a string
+                "timestamp": timestamp
+            }
+            logger.info("✅ Response data structure created")
+            
+            # Test JSON serialization of the full response
+            test_json = json.dumps(response_data)
+            logger.info("✅ Full response is JSON serializable")
+            
+            logger.info("=== RETURNING RESPONSE ===")
+            return jsonify(response_data)
+            
+        except Exception as build_error:
+            logger.error(f"❌ Error building response: {build_error}")
+            logger.error(traceback.format_exc())
+            
+            # Return a safe fallback response
+            return jsonify({
+                "success": False,
+                "response": "I processed your request but encountered an error formatting the response. Please try again."
+            }), 500
         
     except Exception as e:
-        print(f"Chat error: {e}")
+        logger.error(f"❌ MAIN ERROR: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             "success": False,
             "response": f"Sorry, I encountered an error: {str(e)}"

@@ -991,12 +991,21 @@ class UnifiedGeminiChatbot:
                         if hasattr(part, 'function_call') and part.function_call:
                             function_call = part.function_call
                             
-                            if function_call.name == "forecast_category_demand":
-                                return self._format_forecast_response(function_call, session)
-                            elif function_call.name == "identify_top_selling_categories":
-                                return self._format_top_categories_response(function_call, session)
-                            elif function_call.name == "query_database":
-                                return self._format_database_response(function_call, session)
+                            from datetime import datetime
+                            import traceback
+
+                            try: 
+                                if function_call.name == "forecast_category_demand":
+                                    return self._format_forecast_response(function_call, session)
+                                elif function_call.name == "identify_top_selling_categories":
+                                    return self._format_top_categories_response(function_call, session)
+                                elif function_call.name == "query_database":
+                                    return self._format_database_response(function_call, session)
+                            except NameError as e:
+                                if "'datetime' is not defined" in str(e):
+                                    return f"Datetime error in {function_call.name}: {traceback.format_exc()}"
+                                else:
+                                     raise
                         
                         elif hasattr(part, 'text') and part.text:
                             return part.text
