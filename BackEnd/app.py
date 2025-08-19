@@ -9,6 +9,7 @@ from Database_Table.inventory import Inventory
 from Database_Table.order import Order
 from Generative_Models.ChatBot.nlpQuery import query_gemini
 from mockdata import populate_test_data
+from datetime import datetime
 import numpy as np
 
 #Supervised Models
@@ -27,6 +28,9 @@ from pathlib import Path
 MODEL_DIR = Path(__file__).parent / "Supervised_Models"
 
 
+#Gen-ai
+API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw')
+unified_chatbot = None
 
 app = Flask(__name__)
 CORS(app)
@@ -89,32 +93,7 @@ def get_orders():
     session.close()
     return jsonify(result)
 
-@app.route("/test-chatbot", methods=["GET"])
-def test_chatbot():
-    """Endpoint to test inventory and order queries"""
-    test_queries = [
-        # Inventory queries
-        "Suggest an item in inventory would be suitable for a holiday flash sale.Must pick at least 1",
-        # Order queries
-        "Show me all orders for item ID 101",
-        "What was the total profit from corporate customers?",
-        "Which order had the highest discount?",
-        # Combined queries
-        "What's the total quantity ordered for electronics items?",
-        "Show me items that have orders from retail customers",
-    ]
 
-    results = []
-    for query in test_queries:
-        try:
-            answer = query_gemini(query)
-            results.append({"question": query, "answer": answer, "status": "success"})
-        except Exception as e:
-            results.append(
-                {"question": query, "answer": f"Error: {str(e)}", "status": "failed"}
-            )
-
-    return jsonify({"tests": results})
 
 @app.route("/predictLocation", methods=["POST"])
 def predict_location():
@@ -257,80 +236,165 @@ except Exception as e:
     print(f"❌ Error initializing unified chatbot: {e}")
     unified_chatbot = None
 
-# ... existing routes ...
+
+# CHATBOT INITIALIZATION - Start
+# =======================================================================================#
+
+
+def initialize_chatbot():
+    """Initialize chatbot with proper error handling"""
+    global unified_chatbot
+    try:
+        unified_chatbot = create_unified_chatbot(API_KEY)
+        print("✅ Unified chatbot initialized successfully")
+        return True
+    except Exception as e:
+        print(f"❌ Error initializing unified chatbot: {e}")
+        unified_chatbot = None
+        return False
+
+# CHATBOT ROUTES
 @app.route("/chat", methods=["POST", "GET"])
 def unified_chat_endpoint():
-    """Single endpoint for ALL chatbot functionality with intent recognition"""
+    """Single endpoint for ALL chatbot functionality"""
+    global unified_chatbot
+    
+    logger.info(f"=== CHAT ENDPOINT CALLED ===")
+    
     if request.method == "GET":
-        # Serve the chat interface
-        return render_template('chat.html')
+        return jsonify({
+            "message": "Chat endpoint is ready. Send POST requests with 'message' field.",
+            "status": "ready",
+            "chatbot_available": unified_chatbot is not None
+        })
     
     try:
-        if not unified_chatbot:
-            return jsonify({
-                "success": False,
-                "error": "Chatbot service not available",
-                "response": "Sorry, the AI assistant is currently unavailable. Please try again later."
-            }), 503
+        # Initialize chatbot if needed
+        if unified_chatbot is None:
+            if not initialize_chatbot():
+                return jsonify({
+                    "success": False,
+                    "response": "Chatbot service is currently unavailable."
+                }), 503
         
         data = request.get_json()
-        
         if not data or 'message' not in data:
             return jsonify({
                 "success": False,
-                "error": "Missing message in request",
-                "response": "Please provide a message to process."
+                "response": "Please provide a message."
             }), 400
         
         user_message = data['message'].strip()
-        
         if not user_message:
             return jsonify({
                 "success": False,
-                "error": "Empty message",
                 "response": "Please enter a valid question."
             }), 400
         
-        # Let the unified chatbot handle EVERYTHING - it will determine intent automatically
-        response = unified_chatbot.chat_with_unified_intelligence(user_message)
+        logger.info(f"Processing message: '{user_message}'")
         
-        # Simple, clean response
-        return jsonify({
-            "success": True,
-            "message": user_message,
-            "response": response,
-            "timestamp": datetime.datetime.now().isoformat(),
-            "chatbot_type": "unified_intelligence"
-        })
+        # Get response from unified chatbot
+        logger.info("=== CALLING CHATBOT ===")
+        response = unified_chatbot.chat_with_unified_intelligence(user_message)
+        logger.info("=== CHATBOT CALL COMPLETED ===")
+        
+        # Debug the response
+        logger.info(f"Response type: {type(response)}")
+        logger.info(f"Response length: {len(str(response)) if response else 'None'}")
+        
+        # Check if response is serializable
+        try:
+            import json
+            # Try to serialize the response
+            json_test = json.dumps(str(response))
+            logger.info("✅ Response is JSON serializable")
+        except Exception as json_error:
+            logger.error(f"❌ Response not JSON serializable: {json_error}")
+            # Clean the response
+            response = str(response).encode('utf-8', errors='ignore').decode('utf-8')
+            logger.info("🔧 Cleaned response for JSON compatibility")
+        
+        # Test datetime creation
+        try:
+            timestamp = datetime.now().isoformat()  # ← This line fails
+            logger.info(f"✅ Timestamp created: {timestamp}")
+        except Exception as dt_error:
+            logger.error(f"❌ Datetime error: {dt_error}")
+            timestamp = "2025-08-19T19:43:00"  # Fallback timestamp
+
+        # Build response step by step
+        logger.info("=== BUILDING RESPONSE ===")
+        try:
+            response_data = {
+                "success": True,
+                "message": user_message,
+                "response": str(response),  # Ensure it's a string
+                "timestamp": timestamp
+            }
+            logger.info("✅ Response data structure created")
+            
+            # Test JSON serialization of the full response
+            test_json = json.dumps(response_data)
+            logger.info("✅ Full response is JSON serializable")
+            
+            logger.info("=== RETURNING RESPONSE ===")
+            return jsonify(response_data)
+            
+        except Exception as build_error:
+            logger.error(f"❌ Error building response: {build_error}")
+   
+            
+            # Return a safe fallback response
+            return jsonify({
+                "success": False,
+                "response": "I processed your request but encountered an error formatting the response. Please try again."
+            }), 500
         
     except Exception as e:
+        logger.error(f"❌ MAIN ERROR: {e}")
+  
         return jsonify({
             "success": False,
-            "error": str(e),
-            "response": f"An error occurred while processing your request: {str(e)}"
+            "response": f"Sorry, I encountered an error: {str(e)}"
         }), 500
 
 @app.route("/chat/status", methods=["GET"])
 def chat_status():
-    """Simple status check endpoint"""
     return jsonify({
         "success": True,
         "chatbot_available": unified_chatbot is not None,
-        "capabilities": [
-            "Demand Forecasting",
-            "Trend Analysis", 
-            "Database Querying",
-            "Business Intelligence"
-        ],
-        "example_queries": [
-            "Forecast Technology demand for March 2025",
-            "Which categories are declining?",
-            "Show me recent orders for electronics",
-            "What's our best selling category?",
-            "Predict Office Supplies with optimistic scenario"
-        ]
+        "capabilities": ["Demand Forecasting", "Trend Analysis", "Database Querying"]
     })
-# ---------------------------------------------------------------------------
+
+@app.route("/chat/test", methods=["GET"])
+def test_chat():
+    test_message = "What categories do you have?"
+    
+    try:
+        if unified_chatbot is None:
+            initialize_chatbot()
+        
+        if unified_chatbot:
+            response = unified_chatbot.chat_with_unified_intelligence(test_message)
+            return jsonify({
+                "test_message": test_message,
+                "response": response,
+                "status": "success"
+            })
+        else:
+            return jsonify({
+                "test_message": test_message,
+                "response": "Chatbot not available",
+                "status": "failed"
+            })
+    except Exception as e:
+        return jsonify({
+            "test_message": test_message,
+            "response": str(e),
+            "status": "error"
+        })
+#=======================================================================================#
+# CHATBOT INITIALIZATION - End
 
 
 @app.route("/")
