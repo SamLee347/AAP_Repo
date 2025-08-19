@@ -46,42 +46,62 @@ CORS(app)
 
 @app.route("/disposal-prediction", methods=["POST"])
 def disposal_prediction():
-    logger.debug("Request received: %s", request.json)
-
     session = SessionLocal()
     try:
-        item = (
-            session.query(Inventory).filter_by(ItemId=request.json["item_id"]).first()
-        )
+        item = session.query(Inventory).filter_by(ItemId=request.json["item_id"]).first()
         if not item:
             return jsonify({"error": "Item not found"}), 404
 
         features = item.get_disposal_features()
-        logger.debug("Features shape: %s", np.array(features).shape)
-
         model = DISPOSAL_MODEL["model"]
-        prediction = model.predict([features])[0]  # Get single prediction
-        proba = (
-            model.predict_proba([features])[0]
-            if hasattr(model, "predict_proba")
-            else None
-        )  # Fixed
+        
+        # Get prediction and confidence
+        raw_prediction = model.predict([features])[0]
+        
+        # Determine prediction type and get confidence
+        if isinstance(raw_prediction, (float, np.floating)) and 0 <= raw_prediction <= 1:
+            # It's a probability
+            dispose_probability = raw_prediction
+            should_dispose = dispose_probability >= 0.5
+            confidence = dispose_probability if should_dispose else (1 - dispose_probability)
+        else:
+            # It's binary (0 or 1)
+            should_dispose = bool(raw_prediction)
+            confidence = 1.0
+        
+        # Get proper probabilities if available
+        if hasattr(model, "predict_proba"):
+            proba = model.predict_proba([features])[0]
+            confidence = max(proba)  # Actual model confidence
 
-        response = {
-            "recommendation": (
-                "DISPOSE" if prediction >= DISPOSAL_MODEL["threshold"] else "KEEP"
-            ),
-            "confidence": float(max(proba)) if proba is not None else None,  # Now safe
-            "reasons": [
-                f"Quantity: {item.ItemQuantity}",
-                f"Sales: {item.UnitsSold}",
-                (
-                    f"Turnover: {(item.UnitsSold/item.ItemQuantity):.2f}"
-                    if item.ItemQuantity
-                    else "N/A"
-                ),
-            ],
-        }
+        # SET CONFIDENCE THRESHOLD (adjust this value)
+        CONFIDENCE_THRESHOLD = 0.7  # Only show predictions if 70%+ confident
+        
+        if confidence < CONFIDENCE_THRESHOLD:
+            # Model is not confident enough
+            response = {
+                "recommendation": "UNCERTAIN",
+                "confidence": float(confidence),
+                "message": "Model is not confident enough to make a recommendation",
+                "reasons": [
+                    f"Confidence too low: {confidence:.1%}",
+                    f"Minimum required: {CONFIDENCE_THRESHOLD:.0%}",
+                    f"Consider manual review for this item"
+                ]
+            }
+        else:
+            # Model is confident - provide recommendation
+            response = {
+                "recommendation": "DISPOSE" if should_dispose else "KEEP",
+                "confidence": float(confidence),
+                "reasons": [
+                    f"Quantity: {item.ItemQuantity}",
+                    f"Sales: {item.UnitsSold}",
+                    f"Turnover: {(item.UnitsSold/item.ItemQuantity):.2f}" if item.ItemQuantity else "N/A",
+                    f"Confidence: {confidence:.1%}"
+                ]
+            }
+
         return jsonify(response)
 
     except Exception as e:
@@ -315,6 +335,63 @@ def calculate_live_features(item, orders):
     }
 
 
+@app.route('/categorization', methods=["POST"])
+def categorize_item():
+    data = request.json
+    item_id = data.get("item_id")
+
+    if not item_id:
+        return jsonify({"error": "Item ID is required"}), 400
+
+    session = SessionLocal()
+    try:
+        item = session.query(Inventory).filter(Inventory.ItemId == item_id).first()
+        orders = session.query(Order).filter(Order.ItemId == item_id).all()
+
+        if not item:
+            return jsonify({"error": "Item not found"}), 404
+        
+        # Calculate features
+        feature_values = [
+            orders[0].Price if orders else item.Price if item.Price else 0,
+            sum(order.Sales for order in orders) if orders else 0,
+            sum(order.Profit for order in orders) if orders else 0,
+            item.Weight if item.Weight else 0.0,
+            item.ItemQuantity if item.ItemQuantity else 1,
+        ]
+        
+        # Make prediction
+        numeric_prediction = CATEGORY_MODEL['model'].predict([feature_values])[0]
+        
+        # Convert numeric prediction to category name
+        category_name = CATEGORY_MODEL['label_encoder'].inverse_transform([numeric_prediction])[0]
+        
+        # Get confidence score
+        confidence = 80.0
+        if hasattr(CATEGORY_MODEL['model'], 'predict_proba'):
+            proba = CATEGORY_MODEL['model'].predict_proba([feature_values])[0]
+            confidence = max(proba) * 100
+
+        response = {
+            "category": str(category_name),
+            "confidence": float(confidence),
+            "attributes": [
+                f"Price: ${feature_values[0]:.2f}",
+                f"Sales: {feature_values[1]} units",
+                f"Profit: ${feature_values[2]:.2f}",
+                f"Weight: {feature_values[3]} kg",
+                f"Stock: {feature_values[4]} units",
+                f"Total Orders: {len(orders)}"
+            ]
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        logger.error(f"Categorization error: {e}")
+        return jsonify({"error": f"Categorization failed: {str(e)}"}), 500
+    finally:
+        session.close()
 # ====================================== #
 
 

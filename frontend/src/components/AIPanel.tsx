@@ -109,10 +109,15 @@ export function AIPanel({ selectedItem }: AIPanelProps) {
                     {tab.id === "disposal" && (
                       <>
                         <span
-                          className={`badge ${results[tab.id].recommendation === "DISPOSE" ? "badge-danger" : "badge-success"} mb-2`}
-                        >
-                          {results[tab.id].recommendation}
-                        </span>
+                          className={`badge ${
+                            results[tab.id].recommendation === "DISPOSE"
+                              ? "badge-danger"
+                              : results[tab.id].recommendation === "KEEP"
+                              ? "badge-success"
+                            : "badge-warning"  // For UNCERTAIN
+                        } mb-2`}
+                      >{results[tab.id].recommendation}
+</span>
                         <div className="ai-result-confidence">
                           Confidence: {results[tab.id].confidence}%
                         </div>
@@ -156,17 +161,20 @@ export function AIPanel({ selectedItem }: AIPanelProps) {
                         </div>
                       </div>
                     )}
+                    // In your AIPanel component, update the categorization section:
                     {tab.id === "category" && (
                       <>
-                        <span className="badge badge-outline mb-2">{results[tab.id].category}</span>
+                        <span className="badge badge-outline mb-2">
+                          {results[tab.id]?.category || "Unknown"}
+                        </span>
                         <div className="ai-result-confidence">
-                          Confidence: {results[tab.id].confidence}%
+                          Confidence: {results[tab.id]?.confidence?.toFixed(1) || "N/A"}%
                         </div>
                         <div className="ai-result-factors">
                           <div className="ai-result-factors-title">Attributes:</div>
-                          {results[tab.id].attributes?.map((attr, idx) => (
+                          {results[tab.id]?.attributes?.map((attr, idx) => (
                             <div key={idx}>• {attr}</div>
-                          ))}
+                          )) || <div>No attributes available</div>}
                         </div>
                       </>
                     )}
