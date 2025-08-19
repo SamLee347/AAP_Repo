@@ -471,7 +471,7 @@ class GeminiForecaster:
             
             # Make request with function calling capability
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=full_message,
                 config=types.GenerateContentConfig(
                     tools=self.tools,
