@@ -24,7 +24,7 @@ try:
             "Sales",
             "Order_Profit",
             "Quantity",
-            "ProductWeight",
+            "ProductWeight"
             # Add all other expected columns
         ]
 except Exception as e:

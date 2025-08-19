@@ -12,7 +12,7 @@ from mockdata import populate_test_data
 import numpy as np
 
 #Supervised Models
-from load_model import DISPOSAL_MODEL, STORAGE_MODEL, FORECAST_MODEL, CATEGORY_MODEL, REPORT_GENERATION_MODEL
+from load_model import DISPOSAL_MODEL, STORAGE_MODEL, FORECAST_MODEL, CATEGORY_MODEL
 import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -22,9 +22,6 @@ import numpy as np
 import pandas as pd
 import sys
 import os
-from pathlib import Path
-
-MODEL_DIR = Path(__file__).parent / "Supervised_Models"
 
 
 
@@ -141,9 +138,13 @@ def predict_location():
             return jsonify({"error": "Item not found"}), 404
 
         logger.info(f"Found item: {item.ItemId} with {len(orders)} orders")
+
+        # Model loading
+        model_path = 'Supervised_Models/Samuel/storage_prediction_model.pkl'
+        logger.info(f"Loading model from: {model_path}")
         
         try:
-            with open(MODEL_DIR / "Samuel/storage_prediction_model.pkl", 'rb') as file:
+            with open(model_path, 'rb') as file:
                 storage_prediction_model = pickle.load(file)
             logger.debug("Model loaded successfully")
         except Exception as e:
@@ -240,12 +241,6 @@ def predict_location():
         logger.info("Database session closed")
         
     # return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
-# GENERATIVE MODELS
-# REPORT GENERATION
-# ---------------------------------------------------------------------------
-@app.route("/generateReport", methods=["POST"])
-def generate_report():
-    return REPORT_GENERATION_MODEL()
 
 # CHATBOT BACKEND
 # ---------------------------------------------------------------------------

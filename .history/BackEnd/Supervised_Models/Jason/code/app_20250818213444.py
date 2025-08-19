@@ -25,6 +25,12 @@ try:
             "Order_Profit",
             "Quantity",
             "ProductWeight",
+            "Dispatched",
+            "Scheduled_Shipping",
+            "WeekdayOrder",
+            "Customer_Category_Corporate",
+            "Product_type_Fragile",
+            "Shipping_Class_Standard",
             # Add all other expected columns
         ]
 except Exception as e:
