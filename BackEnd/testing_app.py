@@ -1,4 +1,5 @@
 import os
+from datetime import datetime  # ADD THIS MISSING IMPORT
 from sqlalchemy.orm import joinedload
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
@@ -20,7 +21,6 @@ app = Flask(__name__)
 CORS(app)
 
 # ======== Supervised Model =========== #
-
 @app.route('/disposal-prediction', methods=['POST'])
 def disposal_prediction():
     logger.debug("Request received: %s", request.json)
@@ -35,12 +35,12 @@ def disposal_prediction():
         logger.debug("Features shape: %s", np.array(features).shape)
         
         model = DISPOSAL_MODEL['model']
-        prediction = model.predict([features])[0]  # Get single prediction
-        proba = model.predict_proba([features])[0] if hasattr(model, 'predict_proba') else None  # Fixed
+        prediction = model.predict([features])[0]
+        proba = model.predict_proba([features])[0] if hasattr(model, 'predict_proba') else None
         
         response = {
             "recommendation": "DISPOSE" if prediction >= DISPOSAL_MODEL['threshold'] else "KEEP",
-            "confidence": float(max(proba)) if proba is not None else None,  # Now safe
+            "confidence": float(max(proba)) if proba is not None else None,
             "reasons": [
                 f"Quantity: {item.ItemQuantity}",
                 f"Sales: {item.UnitsSold}",
@@ -54,8 +54,10 @@ def disposal_prediction():
         return jsonify({"error": "Prediction service unavailable"}), 500
     finally:
         session.close()
+
 # ====================================== #
 
+# CHATBOT INITIALIZATION - SINGLE CLEAN VERSION
 API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw')
 unified_chatbot = None
 
@@ -71,27 +73,28 @@ def initialize_chatbot():
         unified_chatbot = None
         return False
 
+# CHATBOT ROUTES
 @app.route("/chat", methods=["POST", "GET"])
 def unified_chat_endpoint():
-    """Simple chat endpoint"""
+    """Single endpoint for ALL chatbot functionality"""
     global unified_chatbot
     
     if request.method == "GET":
-        # Serve a simple chat interface (you can create this later)
         return jsonify({
-            "message": "Chat endpoint is ready. Send POST requests with 'message' field."
+            "message": "Chat endpoint is ready. Send POST requests with 'message' field.",
+            "status": "ready",
+            "chatbot_available": unified_chatbot is not None
         })
     
     try:
-        # Initialize chatbot if not already done
+        # Initialize chatbot if needed
         if unified_chatbot is None:
             if not initialize_chatbot():
                 return jsonify({
                     "success": False,
-                    "response": "Chatbot service is currently unavailable. Please try again later."
+                    "response": "Chatbot service is currently unavailable."
                 }), 503
         
-        # Get user message
         data = request.get_json()
         if not data or 'message' not in data:
             return jsonify({
@@ -106,10 +109,9 @@ def unified_chat_endpoint():
                 "response": "Please enter a valid question."
             }), 400
         
-        # Get response from chatbot
+        # Get response from unified chatbot
         response = unified_chatbot.chat_with_unified_intelligence(user_message)
         
-        # Return simple response
         return jsonify({
             "success": True,
             "message": user_message,
@@ -124,9 +126,16 @@ def unified_chat_endpoint():
             "response": f"Sorry, I encountered an error: {str(e)}"
         }), 500
 
+@app.route("/chat/status", methods=["GET"])
+def chat_status():
+    return jsonify({
+        "success": True,
+        "chatbot_available": unified_chatbot is not None,
+        "capabilities": ["Demand Forecasting", "Trend Analysis", "Database Querying"]
+    })
+
 @app.route("/chat/test", methods=["GET"])
 def test_chat():
-    """Simple test endpoint"""
     test_message = "What categories do you have?"
     
     try:
@@ -152,92 +161,6 @@ def test_chat():
             "response": str(e),
             "status": "error"
         })
-        
-# CHATBOT BACKEND
-# ---------------------------------------------------------------------------
-try:
-    API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw')
-    unified_chatbot = create_unified_chatbot(API_KEY)
-    print("✅ Unified chatbot initialized successfully")
-except Exception as e:
-    print(f"❌ Error initializing unified chatbot: {e}")
-    unified_chatbot = None
-
-# ... existing routes ...
-@app.route("/chat", methods=["POST", "GET"])
-def unified_chat_endpoint():
-    """Single endpoint for ALL chatbot functionality with intent recognition"""
-    if request.method == "GET":
-        # Serve the chat interface
-        return render_template('chat.html')
-    
-    try:
-        if not unified_chatbot:
-            return jsonify({
-                "success": False,
-                "error": "Chatbot service not available",
-                "response": "Sorry, the AI assistant is currently unavailable. Please try again later."
-            }), 503
-        
-        data = request.get_json()
-        
-        if not data or 'message' not in data:
-            return jsonify({
-                "success": False,
-                "error": "Missing message in request",
-                "response": "Please provide a message to process."
-            }), 400
-        
-        user_message = data['message'].strip()
-        
-        if not user_message:
-            return jsonify({
-                "success": False,
-                "error": "Empty message",
-                "response": "Please enter a valid question."
-            }), 400
-        
-        # Let the unified chatbot handle EVERYTHING - it will determine intent automatically
-        response = unified_chatbot.chat_with_unified_intelligence(user_message)
-        
-        # Simple, clean response
-        return jsonify({
-            "success": True,
-            "message": user_message,
-            "response": response,
-            "timestamp": datetime.now().isoformat(),
-            "chatbot_type": "unified_intelligence"
-        })
-        
-    except Exception as e:
-        return jsonify({
-"success": False,
-            "error": str(e),
-            "response": f"An error occurred while processing your request: {str(e)}"
-        }), 500
-
-@app.route("/chat/status", methods=["GET"])
-def chat_status():
-    """Simple status check endpoint"""
-    return jsonify({
-        "success": True,
-        "chatbot_available": unified_chatbot is not None,
-        "capabilities": [
-            "Demand Forecasting",
-            "Trend Analysis", 
-            "Database Querying",
-            "Business Intelligence"
-        ],
-        "example_queries": [
-            "Forecast Technology demand for March 2025",
-            "Which categories are declining?",
-            "Show me recent orders for electronics",
-            "What's our best selling category?",
-            "Predict Office Supplies with optimistic scenario"
-        ]
-    })
-# ---------------------------------------------------------------------------
-
 
 if __name__ == "__main__":
     try:
@@ -251,4 +174,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error occurred: {e}: DATABASE NOT INITIALIZED MAYBE DUE TO MYSQL NOT RUNNING")
 
-    app.run(debug=True)
+    app.run(debug=True, port=5000)

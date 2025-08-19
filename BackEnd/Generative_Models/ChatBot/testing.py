@@ -51,7 +51,7 @@ def simple_console_test():
             
             # Import and use the GenAI function
             try:
-                from genaiChatbot import query_gemini
+                from BackEnd.Generative_Models.ChatBot.DONOTRUNTHIS import query_gemini
                 response = query_gemini(user_input)
                 
                 print(f"\n🤖 AI Response:")
@@ -85,7 +85,7 @@ def quick_test_queries():
     ]
     
     try:
-        from genaiChatbot import query_gemini
+        from BackEnd.Generative_Models.ChatBot.DONOTRUNTHIS import query_gemini
         
         for i, query in enumerate(test_queries, 1):
             print(f"\n📊 Test {i}: {query}")

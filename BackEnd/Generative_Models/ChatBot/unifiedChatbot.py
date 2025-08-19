@@ -18,6 +18,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+from contextlib import contextmanager
 
 # Now import the database modules (after sys.path is updated)
 from Database.db import SessionLocal
@@ -32,21 +33,39 @@ class DatabaseQueryService:
         # Configure legacy genai for embeddings
         genai_legacy.configure(api_key=api_key)
         self.embedding_model = "models/text-embedding-004"
-        self.generation_model = genai_legacy.GenerativeModel("gemini-2.0-flash")
+        self.generation_model = genai_legacy.GenerativeModel("gemini-2.5-flash")
         
     def cosine_similarity(self, a, b):
         """Calculate cosine similarity between two vectors"""
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
-
-    def get_db_content(self):
-        """Get all database records"""
-        session = SessionLocal()
-        try:
+    
+    def get_db_content(self, session=None):
+        """Get all database records - NOW accepts optional session"""
+        if session:
+            # Use provided session
             inventory_records = session.query(Inventory).all()
             order_records = session.query(Order).all()
             return inventory_records, order_records
-        finally:
-            session.close()
+        else:
+            # Fallback to creating own session
+            db = SessionLocal()
+            try:
+                inventory_records = db.query(Inventory).all()
+                order_records = db.query(Order).all()
+                return inventory_records, order_records
+            finally:
+                db.close()
+
+
+    # def get_db_content(self):
+    #     """Get all database records"""
+    #     session = SessionLocal()
+    #     try:
+    #         inventory_records = session.query(Inventory).all()
+    #         order_records = session.query(Order).all()
+    #         return inventory_records, order_records
+    #     finally:
+    #         session.close()
 
     def embed_content(self, records):
         """Convert database records to embeddings"""
@@ -86,9 +105,9 @@ class DatabaseQueryService:
                 continue
         
         return embeddings_list
-
-    def query_database(self, question: str, top_k: int = 5) -> Dict[str, Any]:
-        """Query database using RAG approach"""
+    
+    def query_database(self, question: str, top_k: int = 5, session=None) -> Dict[str, Any]:
+        """Query database - NOW accepts optional session"""
         try:
             # Embed the question
             query_emb = np.array(genai_legacy.embed_content(
@@ -96,10 +115,10 @@ class DatabaseQueryService:
                 content=question
             )["embedding"])
 
-            # Get and embed database content
-            inventory, order = self.get_db_content()
+            # Get and embed database content using shared session
+            inventory, order = self.get_db_content(session=session)
             embeddings_list = self.embed_content(inventory + order)
-
+            
             if not embeddings_list:
                 return {
                     "success": False,
@@ -196,7 +215,7 @@ class ForecastService:
             prompt = f"Map '{category_name}' to one of: Technology, Sports and Fitness, Clothing, Other. Reply with only the category name."
             
             response = gemini_client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=prompt
             )
             
@@ -208,11 +227,13 @@ class ForecastService:
         except:
             return "Other"
 
-
-    def get_historical_insights(self, category_name: str, months_back: int = 6) -> Dict[str, Any]:
-        """Get historical data insights for intelligent parameter defaults"""
+    def get_historical_insights(self, category_name: str, months_back: int = 6, 
+                               session=None) -> Dict[str, Any]:
+        """Get historical data insights - NOW accepts optional session"""
         try:
-            db = SessionLocal()
+            # Use provided session or create new one
+            db = session if session else SessionLocal()
+            should_close = session is None  # Only close if we created it
             
             current_date = datetime.now()
             start_date = pd.Timestamp(current_date) - pd.DateOffset(months=months_back)
@@ -231,7 +252,7 @@ class ForecastService:
                     "data_available": False
                 }
             
-            # Fixed: Use proper Order model fields
+            # Process data...
             prices = [order.Price for order in orders if order.Price]
             discount_rates = [order.Discount / order.Price for order in orders if order.Discount and order.Price]
             segments = [order.CustomerSegment for order in orders if order.CustomerSegment]
@@ -244,12 +265,10 @@ class ForecastService:
                 "data_available": True
             }
             
-            db.close()
             return insights
             
         except Exception as e:
-            if 'db' in locals():
-                db.close()
+            print(f"Warning: Could not get historical insights: {e}")
             return {
                 "avg_price": 25.50,
                 "avg_discount_rate": 0.08,
@@ -257,18 +276,21 @@ class ForecastService:
                 "total_orders": 0,
                 "data_available": False
             }
+        finally:
+            if should_close and 'db' in locals():
+                db.close()
 
     def forecast_category_demand(self, category_name: str, future_year_month: str, 
-                               scenario: str = "standard", aggregation_method: str = "average", 
-                               gemini_client=None, **kwargs) -> Dict[str, Any]:
-        """Unified forecasting function with semantic mapping integration"""
+                            scenario: str = "standard", aggregation_method: str = "average", 
+                            gemini_client=None, session=None, **kwargs) -> Dict[str, Any]:
+        """Forecast function - NOW COMPLETE"""
         try:
-            # **KEY UPDATE**: Use semantic mapping with the unified chatbot's client
+            # Use semantic mapping
             mapped_category = self.semantic_category_mapping(category_name, gemini_client)
             print(f"🔄 Semantic mapping: '{category_name}' → '{mapped_category}'")
             
-            # Get historical insights using the mapped category
-            insights = self.get_historical_insights(mapped_category)
+            # Get historical insights using the shared session
+            insights = self.get_historical_insights(mapped_category, session=session)
             
             # Use historical insights or kwargs for parameters
             avg_price = kwargs.get('avg_price', insights['avg_price'])
@@ -335,7 +357,8 @@ class ForecastService:
                     "total_predicted_demand": 0,
                     "semantic_mapping": {
                         "original_category": category_name,
-                        "mapped_category": mapped_category
+                        "mapped_category": mapped_category,
+                        "mapping_successful": False
                     }
                 }
             
@@ -350,7 +373,7 @@ class ForecastService:
             return {
                 "success": True,
                 "category": category_name,
-                "mapped_category": mapped_category,  # **ADDED**: Show the mapping result
+                "mapped_category": mapped_category,
                 "target_month": future_year_month,
                 "scenario": scenario,
                 "total_predicted_demand": round(final_prediction, 2),
@@ -368,7 +391,7 @@ class ForecastService:
                     "subcategories_predicted": len(valid_predictions),
                     "mapped_from": mapped_category
                 },
-                "semantic_mapping": {  # **ADDED**: Semantic mapping details
+                "semantic_mapping": {
                     "original_category": category_name,
                     "mapped_category": mapped_category,
                     "mapping_successful": True
@@ -387,7 +410,381 @@ class ForecastService:
                 }
             }
 
+    # Complete the identify_top_selling_categories method:
+    def identify_top_selling_categories(self, analysis_months: int = 6, 
+                                    top_n: int = 5, session=None) -> Dict[str, Any]:
+        """Top selling categories - NOW COMPLETE"""
+        try:
+            # Use provided session or create new one
+            db = session if session else SessionLocal()
+            should_close = session is None
+            
+            current_date = datetime.now()
+            start_date = pd.Timestamp(current_date) - pd.DateOffset(months=analysis_months)
+            
+            print(f"Analyzing top sellers from {start_date.strftime('%Y-%m')} to now")
+            
+            # Get all orders in the analysis period
+            orders = db.query(Order).join(Inventory).filter(
+                Order.DateOrdered >= start_date.strftime('%Y-%m-%d')
+            ).all()
+            
+            if not orders:
+                return {
+                    "success": False,
+                    "error": "No sales data found in the analysis period",
+                    "top_categories": []
+                }
+            
+            # Group by category and calculate metrics
+            category_stats = {}
+            
+            for order in orders:
+                category = order.inventory_item.ItemCategory
+                if not category:
+                    category = "Unknown"
+                
+                if category not in category_stats:
+                    category_stats[category] = {
+                        "total_sales": 0,
+                        "total_revenue": 0,
+                        "total_profit": 0,
+                        "total_quantity": 0,
+                        "order_count": 0,
+                        "avg_order_value": 0
+                    }
+                
+                # Aggregate metrics
+                category_stats[category]["total_sales"] += order.Sales
+                category_stats[category]["total_revenue"] += order.Price * order.OrderQuantity
+                category_stats[category]["total_profit"] += order.Profit
+                category_stats[category]["total_quantity"] += order.OrderQuantity
+                category_stats[category]["order_count"] += 1
+            
+            # Calculate averages and create final results
+            top_categories = []
+            for category, stats in category_stats.items():
+                stats["avg_order_value"] = stats["total_revenue"] / stats["order_count"] if stats["order_count"] > 0 else 0
+                stats["profit_margin"] = (stats["total_profit"] / stats["total_revenue"]) * 100 if stats["total_revenue"] > 0 else 0
+                
+                top_categories.append({
+                    "category": category,
+                    "total_sales": stats["total_sales"],
+                    "total_revenue": round(stats["total_revenue"], 2),
+                    "total_profit": round(stats["total_profit"], 2),
+                    "total_quantity": stats["total_quantity"],
+                    "order_count": stats["order_count"],
+                    "avg_order_value": round(stats["avg_order_value"], 2),
+                    "profit_margin": round(stats["profit_margin"], 2)
+                })
+            
+            # Sort by total revenue
+            top_categories.sort(key=lambda x: x["total_revenue"], reverse=True)
+            top_categories = top_categories[:top_n]
+            
+            return {
+                "success": True,
+                "analysis_period": f"{analysis_months} months",
+                "top_categories": top_categories,
+                "total_categories_analyzed": len(category_stats),
+                "top_n": top_n,
+                "summary": {
+                    "best_performer": top_categories[0] if top_categories else None,
+                    "total_revenue_analyzed": sum(cat["total_revenue"] for cat in top_categories),
+                    "total_orders_analyzed": sum(cat["order_count"] for cat in top_categories)
+                }
+            }
+            
+        except Exception as e:
+            print(f"❌ Error in top selling analysis: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "top_categories": []
+            }
+        finally:
+            if should_close and 'db' in locals():
+                db.close()
 
+    # Original 
+    # def get_historical_insights(self, category_name: str, months_back: int = 6, session=None) -> Dict[str, Any]:
+    #     """Get historical data insights for intelligent parameter defaults"""
+    #     try:
+    #         db = session if session else SessionLocal()
+    #         should_close = session is None  # Only close if we created it
+            
+    #         if session:
+    #             db = session
+
+    #         current_date = datetime.now()
+    #         start_date = pd.Timestamp(current_date) - pd.DateOffset(months=months_back)
+            
+    #         orders = db.query(Order).join(Inventory).filter(
+    #             Order.DateOrdered >= start_date.strftime('%Y-%m-%d'),
+    #             Inventory.ItemCategory == category_name
+    #         ).all()
+            
+    #         if not orders:
+    #             return {
+    #                 "avg_price": 25.50,
+    #                 "avg_discount_rate": 0.08,
+    #                 "dominant_segment": "Consumer",
+    #                 "total_orders": 0,
+    #                 "data_available": False
+    #             }
+            
+    #         # Fixed: Use proper Order model fields
+    #         prices = [order.Price for order in orders if order.Price]
+    #         discount_rates = [order.Discount / order.Price for order in orders if order.Discount and order.Price]
+    #         segments = [order.CustomerSegment for order in orders if order.CustomerSegment]
+            
+    #         insights = {
+    #             "avg_price": np.mean(prices) if prices else 25.50,
+    #             "avg_discount_rate": np.mean(discount_rates) if discount_rates else 0.08,
+    #             "dominant_segment": max(set(segments), key=segments.count) if segments else "Consumer",
+    #             "total_orders": len(orders),
+    #             "data_available": True
+    #         }
+            
+    #         db.close()
+    #         return insights
+            
+    #     except Exception as e:
+    #         if 'db' in locals():
+    #             db.close()
+    #         return {
+    #             "avg_price": 25.50,
+    #             "avg_discount_rate": 0.08,
+    #             "dominant_segment": "Consumer",
+    #             "total_orders": 0,
+    #             "data_available": False
+    #         }
+
+    # def forecast_category_demand(self, category_name: str, future_year_month: str, 
+    #                            scenario: str = "standard", aggregation_method: str = "average", 
+    #                            gemini_client=None, **kwargs) -> Dict[str, Any]:
+    #     """Unified forecasting function with semantic mapping integration"""
+    #     try:
+    #         # **KEY UPDATE**: Use semantic mapping with the unified chatbot's client
+    #         mapped_category = self.semantic_category_mapping(category_name, gemini_client)
+    #         print(f"🔄 Semantic mapping: '{category_name}' → '{mapped_category}'")
+            
+    #         # Get historical insights using the mapped category
+    #         insights = self.get_historical_insights(mapped_category)
+            
+    #         # Use historical insights or kwargs for parameters
+    #         avg_price = kwargs.get('avg_price', insights['avg_price'])
+    #         customer_segment = kwargs.get('customer_segment', insights['dominant_segment'])
+    #         discount_rate = kwargs.get('discount_rate', insights['avg_discount_rate'])
+            
+    #         # Apply scenario adjustments
+    #         if scenario == "conservative":
+    #             avg_price *= 0.95
+    #             discount_rate *= 1.2
+    #         elif scenario == "optimistic":
+    #             avg_price *= 1.05
+    #             discount_rate *= 0.8
+            
+    #         # Parse future date
+    #         future_date = pd.to_datetime(future_year_month)
+            
+    #         # Calculate time features
+    #         months_since_start = ((future_date - self.reference_date).days / 30.44)
+            
+    #         # Get specific categories for the mapped category
+    #         specific_categories = self.category_mapping.get(mapped_category, [mapped_category])
+            
+    #         total_prediction = 0
+    #         valid_predictions = []
+    #         category_predictions = []
+            
+    #         for specific_cat in specific_categories:
+    #             if specific_cat in self.le_category.classes_:
+    #                 # Create test data
+    #                 test_data = {
+    #                     'Category Name': specific_cat,
+    #                     'Average Product Price': avg_price,
+    #                     'Customer Segment': customer_segment,
+    #                     'Order Item Discount Rate': discount_rate,
+    #                     'Year': future_date.year,
+    #                     'Month': future_date.month,
+    #                     'Quarter': future_date.quarter,
+    #                     'Months_Since_Start': int(months_since_start),
+    #                     'Month_Sin': np.sin(2 * np.pi * future_date.month / 12),
+    #                     'Month_Cos': np.cos(2 * np.pi * future_date.month / 12),
+    #                     'Year_Trend': future_date.year - self.reference_date.year
+    #                 }
+                    
+    #                 # Create DataFrame and preprocess
+    #                 test_df = pd.DataFrame([test_data])
+    #                 test_df['Category Name'] = self.le_category.transform(test_df['Category Name'])
+    #                 test_df = pd.get_dummies(test_df, columns=['Customer Segment'], drop_first=True)
+    #                 test_df = test_df.reindex(columns=self.feature_columns, fill_value=0)
+                    
+    #                 # Make prediction
+    #                 prediction = self.model.predict(test_df)[0]
+    #                 total_prediction += prediction
+    #                 valid_predictions.append(prediction)
+    #                 category_predictions.append({
+    #                     'subcategory': specific_cat,
+    #                     'predicted_demand': round(prediction, 2)
+    #                 })
+            
+    #         if not valid_predictions:
+    #             return {
+    #                 "success": False,
+    #                 "error": f"No valid subcategories found for {category_name} (mapped to {mapped_category})",
+    #                 "total_predicted_demand": 0,
+    #                 "semantic_mapping": {
+    #                     "original_category": category_name,
+    #                     "mapped_category": mapped_category
+    #                 }
+    #             }
+            
+    #         # Calculate final aggregation
+    #         if aggregation_method == "median":
+    #             final_prediction = np.median(valid_predictions) * len(valid_predictions)
+    #         elif aggregation_method == "recent":
+    #             final_prediction = total_prediction * 1.1 if scenario == "optimistic" else total_prediction * 0.9
+    #         else:  # average (default)
+    #             final_prediction = total_prediction
+            
+    #         return {
+    #             "success": True,
+    #             "category": category_name,
+    #             "mapped_category": mapped_category,  # **ADDED**: Show the mapping result
+    #             "target_month": future_year_month,
+    #             "scenario": scenario,
+    #             "total_predicted_demand": round(final_prediction, 2),
+    #             "average_per_subcategory": round(final_prediction / len(valid_predictions), 2),
+    #             "subcategory_breakdown": category_predictions,
+    #             "parameters_used": {
+    #                 "avg_price": round(avg_price, 2),
+    #                 "customer_segment": customer_segment,
+    #                 "discount_rate": round(discount_rate, 3),
+    #                 "historical_data_available": insights['data_available'],
+    #                 "historical_orders": insights['total_orders']
+    #             },
+    #             "model_info": {
+    #                 "aggregation_method": aggregation_method,
+    #                 "subcategories_predicted": len(valid_predictions),
+    #                 "mapped_from": mapped_category
+    #             },
+    #             "semantic_mapping": {  # **ADDED**: Semantic mapping details
+    #                 "original_category": category_name,
+    #                 "mapped_category": mapped_category,
+    #                 "mapping_successful": True
+    #             }
+    #         }
+            
+    #     except Exception as e:
+    #         return {
+    #             "success": False,
+    #             "error": str(e),
+    #             "total_predicted_demand": 0,
+    #             "semantic_mapping": {
+    #                 "original_category": category_name,
+    #                 "mapped_category": "Error",
+    #                 "mapping_successful": False
+    #             }
+    #         }
+
+    # def identify_top_selling_categories(self, analysis_months: int = 6, top_n: int = 5) -> Dict[str, Any]:
+    #     try:
+    #         db = SessionLocal()
+            
+    #         # Calculate date range
+    #         current_date = datetime.now()
+    #         start_date = pd.Timestamp(current_date) - pd.DateOffset(months=analysis_months)
+            
+    #         print(f"Analyzing top sellers from {start_date.strftime('%Y-%m')} to now")
+            
+    #         # Get all orders in the analysis period
+    #         orders = db.query(Order).join(Inventory).filter(
+    #             Order.DateOrdered >= start_date.strftime('%Y-%m-%d')
+    #         ).all()
+            
+    #         if not orders:
+    #             db.close()
+    #             return {
+    #                 "success": False,
+    #                 "error": "No sales data found in the analysis period",
+    #                 "top_categories": []
+    #             }
+            
+    #         # Group by category and calculate metrics
+    #         category_stats = {}
+            
+    #         for order in orders:
+    #             category = order.inventory_item.ItemCategory
+    #             if not category:
+    #                 category = "Unknown"
+                
+    #             if category not in category_stats:
+    #                 category_stats[category] = {
+    #                     "total_sales": 0,
+    #                     "total_revenue": 0,
+    #                     "total_profit": 0,
+    #                     "total_quantity": 0,
+    #                     "order_count": 0,
+    #                     "avg_order_value": 0
+    #                 }
+                
+    #             # Aggregate metrics
+    #             category_stats[category]["total_sales"] += order.Sales
+    #             category_stats[category]["total_revenue"] += order.Price * order.OrderQuantity
+    #             category_stats[category]["total_profit"] += order.Profit
+    #             category_stats[category]["total_quantity"] += order.OrderQuantity
+    #             category_stats[category]["order_count"] += 1
+            
+    #         # Calculate averages and create final results
+    #         top_categories = []
+    #         for category, stats in category_stats.items():
+    #             stats["avg_order_value"] = stats["total_revenue"] / stats["order_count"] if stats["order_count"] > 0 else 0
+    #             stats["profit_margin"] = (stats["total_profit"] / stats["total_revenue"]) * 100 if stats["total_revenue"] > 0 else 0
+                
+    #             top_categories.append({
+    #                 "category": category,
+    #                 "total_sales": stats["total_sales"],
+    #                 "total_revenue": round(stats["total_revenue"], 2),
+    #                 "total_profit": round(stats["total_profit"], 2),
+    #                 "total_quantity": stats["total_quantity"],
+    #                 "order_count": stats["order_count"],
+    #                 "avg_order_value": round(stats["avg_order_value"], 2),
+    #                 "profit_margin": round(stats["profit_margin"], 2)
+    #             })
+            
+    #         # Sort by total revenue (you can change this to total_sales or total_profit)
+    #         top_categories.sort(key=lambda x: x["total_revenue"], reverse=True)
+            
+    #         # Get top N categories
+    #         top_categories = top_categories[:top_n]
+            
+    #         db.close()
+            
+    #         return {
+    #             "success": True,
+    #             "analysis_period": f"{analysis_months} months",
+    #             "top_categories": top_categories,
+    #             "total_categories_analyzed": len(category_stats),
+    #             "top_n": top_n,
+    #             "summary": {
+    #                 "best_performer": top_categories[0] if top_categories else None,
+    #                 "total_revenue_analyzed": sum(cat["total_revenue"] for cat in top_categories),
+    #                 "total_orders_analyzed": sum(cat["order_count"] for cat in top_categories)
+    #             }
+    #         }
+        
+    #     except Exception as e:
+    #         if 'db' in locals():
+    #             db.close()
+    #         print(f"❌ Error in top selling analysis: {e}")
+    #         return {
+    #             "success": False,
+    #             "error": str(e),
+    #             "top_categories": []
+    #         }
+            
 class UnifiedGeminiChatbot:
     """Unified chatbot with forecasting AND database querying capabilities"""
     
@@ -435,24 +832,25 @@ class UnifiedGeminiChatbot:
                 }
             },
             {
-                "name": "identify_declining_categories",
-                "description": "Identifies categories with declining demand trends based on historical analysis.",
+                "name": "identify_top_selling_categories",
+                "description": "Identifies top performing categories based on sales, revenue, and profit metrics",
                 "parameters": {
-                    "type": "object",
+                    "type": "object", 
                     "properties": {
-                        "analysis_months": { 
-                            "type": "integer", 
-                            "description": "Number of historical months to analyze",
-                            "default": 6 
+                        "analysis_months": {
+                            "type": "integer",
+                            "description": "How many months to analyze (default: 6)",
+                            "default": 6
                         },
-                        "decline_threshold": { 
-                            "type": "number", 
-                            "description": "Minimum decline percentage (negative number)",
-                            "default": -10.0 
+                        "top_n": {
+                            "type": "integer", 
+                            "description": "Number of top categories to return (default: 5)",
+                            "default": 5
                         }
                     }
                 }
             },
+            
             {
                 "name": "query_database",
                 "description": "Query the inventory and order database using natural language with semantic search.",
@@ -482,26 +880,35 @@ class UnifiedGeminiChatbot:
         print("✅ UnifiedGeminiChatbot initialized successfully")
         print(f"   Available functions: {len(self.function_schemas)}")
         print("   Capabilities: Forecasting, Trend Analysis, Database Querying")
+        
+    @contextmanager
+    def shared_db_session(self):
+        """Context manager for shared database session across all operations"""
+        session = SessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
 
     def forecast_category_demand(self, category_name: str, future_year_month: str, 
                                scenario: str = "standard", aggregation_method: str = "average",
-                               **kwargs) -> Dict[str, Any]:
+                               session=None, **kwargs) -> Dict[str, Any]:
         """Forecast function for Gemini to call"""
         return self.forecast_service.forecast_category_demand(
             category_name, future_year_month, scenario,
-            aggregation_method, gemini_client=self.client, **kwargs
+            aggregation_method, gemini_client=self.client, session=session, **kwargs
+        )
+    
+    def identify_top_selling_categories(self, analysis_months: int = 6, 
+                                       top_n: int = 5, session=None) -> Dict[str, Any]:
+        """Top selling categories function - NOW accepts session"""
+        return self.forecast_service.identify_top_selling_categories(
+            analysis_months, top_n, session=session
         )
 
-    def identify_declining_categories(self, analysis_months: int = 6, 
-                                    decline_threshold: float = -10.0) -> Dict[str, Any]:
-        """Declining categories function for Gemini to call"""
-        return self.forecast_service.identify_declining_categories(
-            analysis_months, decline_threshold
-        )
-
-    def query_database(self, question: str, top_k: int = 5) -> Dict[str, Any]:
+    def query_database(self, question: str, top_k: int = 5, session=None) -> Dict[str, Any]:
         """Database query function for Gemini to call"""
-        return self.database_service.query_database(question, top_k)
+        return self.database_service.query_database(question, top_k, session=session)
 
     def determine_query_type(self, user_message: str) -> str:
         """Determine if this is a forecasting or database query"""
@@ -527,81 +934,83 @@ class UnifiedGeminiChatbot:
     def chat_with_unified_intelligence(self, user_message: str) -> str:
         """
         Main chat function with unified forecasting and database capabilities
-        **UPDATED** with enhanced semantic mapping integration
+        **FIXED** - Now properly uses shared session
         """
         try:
-            # Enhanced system prompt that mentions semantic mapping
-            system_prompt = """You are an expert AI assistant for business intelligence, sales forecasting, and data analysis.
+            # Use ONE session for the entire conversation
+            with self.shared_db_session() as session:
+                # Enhanced system prompt
+                system_prompt = """You are an expert AI assistant for business intelligence, sales forecasting, and data analysis.
 
-You have access to multiple powerful capabilities:
+    You have access to multiple powerful capabilities:
 
-1. **XGBoost Forecasting Model** - Predicts future demand for categories using time series analysis
-   - **Smart Category Mapping**: Automatically maps user categories to model categories using semantic analysis
-   - Available model categories: Technology, Sports and Fitness, Clothing, Other
-   
-2. **Declining Categories Analysis** - Identifies categories with declining trends and risk assessment  
-3. **Database Intelligence** - Query inventory and order data using semantic search
+    1. **XGBoost Forecasting Model** - Predicts future demand for categories using time series analysis
+    - **Smart Category Mapping**: Automatically maps user categories to model categories using semantic analysis
+    - Available model categories: Technology, Sports and Fitness, Clothing, Other
+    
+    2. **Top Selling Categories Analysis** - Identifies best performing categories by revenue and sales
+    3. **Database Intelligence** - Query inventory and order data using semantic search
 
-**Semantic Category Mapping**: When users mention categories like "electronics", "computers", "gadgets" → maps to "Technology"
-When users mention "sports equipment", "fitness gear" → maps to "Sports and Fitness"
-When users mention "clothes", "apparel", "fashion" → maps to "Clothing"
+    **Semantic Category Mapping**: When users mention categories like "electronics", "computers", "gadgets" → maps to "Technology"
+    When users mention "sports equipment", "fitness gear" → maps to "Sports and Fitness"
+    When users mention "clothes", "apparel", "fashion" → maps to "Clothing"
 
-**Forecasting scenarios:**
-- Conservative: Lower prices, higher discounts (pessimistic market)
-- Standard: Historical averages (normal conditions)
-- Optimistic: Higher prices, lower discounts (strong market)
+    **Forecasting scenarios:**
+    - Conservative: Lower prices, higher discounts (pessimistic market)
+    - Standard: Historical averages (normal conditions)
+    - Optimistic: Higher prices, lower discounts (strong market)
 
-**When to use each function:**
-- Future predictions/demand → use forecast_category_demand (with semantic mapping)
-- Declining trends/risk analysis → use identify_declining_categories  
-- Historical data questions → use query_database
-- Mixed queries → combine multiple functions
+    **When to use each function:**
+    - Future predictions/demand → use forecast_category_demand (with semantic mapping)
+    - Top performers/best sellers → use identify_top_selling_categories
+    - Historical data questions → use query_database
+    - Mixed queries → combine multiple functions
 
-Always provide actionable business insights and explain the semantic mapping when categories are translated."""
+    Always provide actionable business insights and explain the semantic mapping when categories are translated."""
 
-            # Prepare conversation
-            full_message = f"{system_prompt}\n\nUser: {user_message}"
-            
-            # Make request with function calling
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=full_message,
-                config=types.GenerateContentConfig(
-                    tools=self.tools,
-                    tool_config=types.ToolConfig(
-                        function_calling_config=types.FunctionCallingConfig(
-                            mode="ANY"
+                # Prepare conversation
+                full_message = f"{system_prompt}\n\nUser: {user_message}"
+                
+                # Make request with function calling
+                response = self.client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=full_message,
+                    config=types.GenerateContentConfig(
+                        tools=self.tools,
+                        tool_config=types.ToolConfig(
+                            function_calling_config=types.FunctionCallingConfig(
+                                mode="ANY"
+                            )
                         )
                     )
                 )
-            )
-            
-            # Handle function calls
-            if response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, 'function_call') and part.function_call:
-                        function_call = part.function_call
+                
+                # Handle function calls - ALL using the same session
+                if response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        if hasattr(part, 'function_call') and part.function_call:
+                            function_call = part.function_call
+                            
+                            if function_call.name == "forecast_category_demand":
+                                return self._format_forecast_response(function_call, session)
+                            elif function_call.name == "identify_top_selling_categories":
+                                return self._format_top_categories_response(function_call, session)
+                            elif function_call.name == "query_database":
+                                return self._format_database_response(function_call, session)
                         
-                        if function_call.name == "forecast_category_demand":
-                            return self._format_forecast_response(function_call)
-                        elif function_call.name == "identify_declining_categories":
-                            return self._format_declining_response(function_call)
-                        elif function_call.name == "query_database":
-                            return self._format_database_response(function_call)
-                    
-                    elif hasattr(part, 'text') and part.text:
-                        return part.text
-            
-            return "I can help you with sales forecasting, trend analysis, and database queries. What would you like to know?"
-            
+                        elif hasattr(part, 'text') and part.text:
+                            return part.text
+                
+                return "I can help you with sales forecasting, trend analysis, and database queries. What would you like to know?"
+                
         except Exception as e:
             return f"Error processing request: {str(e)}"
 
-    def _format_forecast_response(self, function_call) -> str:
+    def _format_forecast_response(self, function_call, session) -> str:
         """**UPDATED** Format forecasting response with semantic mapping details"""
         try:
             args = function_call.args
-            result = self.forecast_category_demand(**args)
+            result = self.forecast_category_demand(session=session, **args)
             
             if result["success"]:
                 # **ENHANCED**: Show semantic mapping information
@@ -610,39 +1019,40 @@ Always provide actionable business insights and explain the semantic mapping whe
                     mapping = result['semantic_mapping']
                     if mapping['original_category'] != mapping['mapped_category']:
                         mapping_info = f"""
-                            🔄 **SEMANTIC MAPPING:**
-                            • Your category: "{mapping['original_category']}"
-                            • Mapped to: "{mapping['mapped_category']}"
-                            • This allows the AI to understand your intent and use the correct model category.
-                            """
+🔄 **SEMANTIC MAPPING:**
+• Your category: "{mapping['original_category']}"
+• Mapped to: "{mapping['mapped_category']}"
+• This allows the AI to understand your intent and use the correct model category.
+"""
 
                 forecast_text = f"""
-                        🔮 **DEMAND FORECAST RESULTS**
-                        {mapping_info}
-                        **Category:** {result['category']} → {result.get('mapped_category', 'N/A')}
-                        **Target Month:** {result['target_month']}
-                        **Scenario:** {result['scenario'].title()}
+🔮 **DEMAND FORECAST RESULTS**
+{mapping_info}
+**Category:** {result['category']} → {result.get('mapped_category', 'N/A')}
+**Target Month:** {result['target_month']}
+**Scenario:** {result['scenario'].title()}
 
-                        **📊 PREDICTION:**
-                        • **Total Predicted Demand:** {result['total_predicted_demand']} units
-                        • **Average per Subcategory:** {result['average_per_subcategory']} units
+**📊 PREDICTION:**
+• **Total Predicted Demand:** {result['total_predicted_demand']} units
+• **Average per Subcategory:** {result['average_per_subcategory']} units
 
-                        **📋 SUBCATEGORY BREAKDOWN:**"""
+**📋 SUBCATEGORY BREAKDOWN:**"""
+
                 for sub in result['subcategory_breakdown']:
                     forecast_text += f"\n• {sub['subcategory']}: {sub['predicted_demand']} units"
                 
                 forecast_text += f"""
-                **⚙️ PARAMETERS USED:**
-                • Average Price: ${result['parameters_used']['avg_price']}
-                • Customer Segment: {result['parameters_used']['customer_segment']}
-                • Discount Rate: {result['parameters_used']['discount_rate']*100:.1f}%
-                • Historical Data: {'✅ Available' if result['parameters_used']['historical_data_available'] else '❌ Not Available'}
+    **⚙️ PARAMETERS USED:**
+    • Average Price: ${result['parameters_used']['avg_price']}
+    • Customer Segment: {result['parameters_used']['customer_segment']}
+    • Discount Rate: {result['parameters_used']['discount_rate']*100:.1f}%
+    • Historical Data: {'✅ Available' if result['parameters_used']['historical_data_available'] else '❌ Not Available'}
 
-                **📈 BUSINESS INSIGHTS:**
-                Based on this forecast, I recommend:
-                1. **Inventory Planning:** Stock approximately {result['total_predicted_demand']} units for {result['target_month']}
-                2. **Scenario Analysis:** This {result['scenario']} scenario helps with risk assessment
-                3. **Category Focus:** {result['model_info']['subcategories_predicted']} subcategories analyzed"""
+    **📈 BUSINESS INSIGHTS:**
+    Based on this forecast, I recommend:
+    1. **Inventory Planning:** Stock approximately {result['total_predicted_demand']} units for {result['target_month']}
+    2. **Scenario Analysis:** This {result['scenario']} scenario helps with risk assessment
+    3. **Category Focus:** {result['model_info']['subcategories_predicted']} subcategories analyzed"""
 
                 return forecast_text
             else:
@@ -655,6 +1065,69 @@ Always provide actionable business insights and explain the semantic mapping whe
         except Exception as e:
             return f"❌ Error formatting forecast: {e}"
         
+    def _format_top_categories_response(self, function_call, session) -> str:
+        """Format top categories response using shared session"""
+        try:
+            args = function_call.args
+            result = self.identify_top_selling_categories(session=session, **args)
+            
+            if result["success"]:
+                if not result["top_categories"]:
+                    return "📊 No sales data found for the analysis period."
+                
+                response = f"""🏆 **TOP SELLING CATEGORIES** (Last {result['analysis_period']})
+
+**📈 PERFORMANCE RANKINGS:**
+"""
+                
+                for i, cat in enumerate(result["top_categories"], 1):
+                    response += f"""
+**#{i}. {cat['category']}**
+• Revenue: ${cat['total_revenue']:,}
+• Sales: {cat['total_sales']} units
+• Profit: ${cat['total_profit']:,}
+• Orders: {cat['order_count']}
+• Avg Order Value: ${cat['avg_order_value']}
+• Profit Margin: {cat['profit_margin']:.1f}%
+"""
+
+                response += f"""
+**📊 SUMMARY:**
+• Best Performer: **{result['summary']['best_performer']['category']}**
+• Total Revenue: ${result['summary']['total_revenue_analyzed']:,}
+• Total Orders: {result['summary']['total_orders_analyzed']}
+• Categories Analyzed: {result['total_categories_analyzed']}
+"""
+                return response
+            else:
+                return f"❌ Error analyzing top sellers: {result['error']}"
+        except Exception as e:
+            return f"❌ Error formatting top categories: {e}"
+
+    def _format_database_response(self, function_call, session) -> str:
+        """Format database response using shared session"""
+        try:
+            args = function_call.args
+            result = self.query_database(session=session, **args)
+            
+            if result["success"]:
+                response = f"""
+🗄️ **DATABASE QUERY RESULTS**
+
+**📋 Answer:**
+{result['answer']}
+
+**📊 Query Details:**
+• Records analyzed: {result['sources_used']}
+• Relevance scores: {[f"{score:.3f}" for score in result['relevance_scores'][:3]]}
+• Data sources: {', '.join(result['record_ids'][:3])}
+"""
+                return response
+            else:
+                return f"❌ Database Error: {result['error']}"
+        except Exception as e:
+            return f"❌ Error formatting database response: {e}"
+
 def create_unified_chatbot(api_key: str) -> UnifiedGeminiChatbot:
     """Create a unified chatbot instance"""
     backend_dir = Path(__file__).parent.parent.parent
