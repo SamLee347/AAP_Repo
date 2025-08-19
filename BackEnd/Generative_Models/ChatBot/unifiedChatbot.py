@@ -208,7 +208,6 @@ class ForecastService:
         except:
             return "Other"
 
-
     def get_historical_insights(self, category_name: str, months_back: int = 6) -> Dict[str, Any]:
         """Get historical data insights for intelligent parameter defaults"""
         try:
@@ -490,13 +489,6 @@ class UnifiedGeminiChatbot:
         return self.forecast_service.forecast_category_demand(
             category_name, future_year_month, scenario,
             aggregation_method, gemini_client=self.client, **kwargs
-        )
-
-    def identify_declining_categories(self, analysis_months: int = 6, 
-                                    decline_threshold: float = -10.0) -> Dict[str, Any]:
-        """Declining categories function for Gemini to call"""
-        return self.forecast_service.identify_declining_categories(
-            analysis_months, decline_threshold
         )
 
     def query_database(self, question: str, top_k: int = 5) -> Dict[str, Any]:

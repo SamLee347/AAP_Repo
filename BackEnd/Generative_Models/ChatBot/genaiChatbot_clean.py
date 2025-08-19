@@ -9,7 +9,7 @@ backend_dir = Path(__file__).parent.parent.parent
 sys.path.append(str(backend_dir))
 
 from google import genai
-from google.genai import types
+from google.genai import types  
 
 import joblib
 import pickle
@@ -247,7 +247,103 @@ class ForecastService:
                 "total_predicted_demand": 0
             }
 
-
+    def identify_top_selling_categories(self, analysis_months: int = 6, top_n: int = 5) -> Dict[str, Any]:
+        try:
+            db = SessionLocal()
+            
+            # Calculate date range
+            current_date = datetime.now()
+            start_date = pd.Timestamp(current_date) - pd.DateOffset(months=analysis_months)
+            
+            print(f"Analyzing top sellers from {start_date.strftime('%Y-%m')} to now")
+            
+            # Get all orders in the analysis period
+            orders = db.query(Order).join(Inventory).filter(
+                Order.DateOrdered >= start_date.strftime('%Y-%m-%d')
+            ).all()
+            
+            if not orders:
+                db.close()
+                return {
+                    "success": False,
+                    "error": "No sales data found in the analysis period",
+                    "top_categories": []
+                }
+            
+            # Group by category and calculate metrics
+            category_stats = {}
+            
+            for order in orders:
+                category = order.inventory_item.ItemCategory
+                if not category:
+                    category = "Unknown"
+                
+                if category not in category_stats:
+                    category_stats[category] = {
+                        "total_sales": 0,
+                        "total_revenue": 0,
+                        "total_profit": 0,
+                        "total_quantity": 0,
+                        "order_count": 0,
+                        "avg_order_value": 0
+                    }
+                
+                # Aggregate metrics
+                category_stats[category]["total_sales"] += order.Sales
+                category_stats[category]["total_revenue"] += order.Price * order.OrderQuantity
+                category_stats[category]["total_profit"] += order.Profit
+                category_stats[category]["total_quantity"] += order.OrderQuantity
+                category_stats[category]["order_count"] += 1
+            
+            # Calculate averages and create final results
+            top_categories = []
+            for category, stats in category_stats.items():
+                stats["avg_order_value"] = stats["total_revenue"] / stats["order_count"] if stats["order_count"] > 0 else 0
+                stats["profit_margin"] = (stats["total_profit"] / stats["total_revenue"]) * 100 if stats["total_revenue"] > 0 else 0
+                
+                top_categories.append({
+                    "category": category,
+                    "total_sales": stats["total_sales"],
+                    "total_revenue": round(stats["total_revenue"], 2),
+                    "total_profit": round(stats["total_profit"], 2),
+                    "total_quantity": stats["total_quantity"],
+                    "order_count": stats["order_count"],
+                    "avg_order_value": round(stats["avg_order_value"], 2),
+                    "profit_margin": round(stats["profit_margin"], 2)
+                })
+            
+            # Sort by total revenue (you can change this to total_sales or total_profit)
+            top_categories.sort(key=lambda x: x["total_revenue"], reverse=True)
+            
+            # Get top N categories
+            top_categories = top_categories[:top_n]
+            
+            db.close()
+            
+            return {
+                "success": True,
+                "analysis_period": f"{analysis_months} months",
+                "top_categories": top_categories,
+                "total_categories_analyzed": len(category_stats),
+                "top_n": top_n,
+                "summary": {
+                    "best_performer": top_categories[0] if top_categories else None,
+                    "total_revenue_analyzed": sum(cat["total_revenue"] for cat in top_categories),
+                    "total_orders_analyzed": sum(cat["order_count"] for cat in top_categories)
+                }
+            }
+        
+        except Exception as e:
+            if 'db' in locals():
+                db.close()
+            print(f"❌ Error in top selling analysis: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "top_categories": []
+            }
+                                        
+                                        
 class GeminiForecaster:
     def __init__(self, api_key: str, model_path: str, preprocessor_path: str):
         """Initialize Gemini with forecasting capabilities"""
@@ -290,6 +386,27 @@ class GeminiForecaster:
                     },
                     "required": ["category_name", "future_year_month"]
                 }
+            },
+            
+            # Top Selling Categories
+            {
+                "name": "identify_top_selling_categories",
+                "description": "Identify top performing categories based on sales, revenue, and profit metrics",
+                "parameters": {
+                    "type": "object", 
+                    "properties": {
+                        "analysis_months": {
+                            "type": "integer",
+                            "description": "How many months to analyze (default: 6)",
+                            "default": 6
+                        },
+                        "top_n": {
+                            "type": "integer", 
+                            "description": "Number of top categories to return (default: 5)",
+                            "default": 5
+                        }
+                    }
+                }
             }
         ]
         
@@ -310,6 +427,13 @@ class GeminiForecaster:
             category_name, future_year_month, scenario,
             aggregation_method, gemini_client=self.client, **kwargs
         )
+    
+    def identify_top_selling_categories(self, analysis_months: int = 6, top_n: int = 5) -> Dict[str, Any]:
+        """Call the top selling categories analysis"""
+        return self.forecast_service.identify_top_selling_categories(
+            analysis_months, top_n
+    )
+    
 
     def chat_with_forecasting(self, user_message: str) -> str:
         """
@@ -319,23 +443,28 @@ class GeminiForecaster:
             # System prompt for forecasting context
             system_prompt = """You are an expert AI assistant for sales forecasting and inventory management. 
 
-You have access to a sophisticated XGBoost time series forecasting model that can predict demand for different product categories. The model was trained on historical sales data and uses features like:
-- Category-specific patterns
-- Time series features (seasonality, trends)
-- Price and discount information  
-- Customer segment data
-- Historical purchasing patterns
+            You have access to a sophisticated XGBoost time series forecasting model that can predict demand for different product categories. The model was trained on historical sales data and uses features like:
+            - Category-specific patterns
+            - Time series features (seasonality, trends)
+            - Price and discount information  
+            - Customer segment data
+            - Historical purchasing patterns
+            - **XGBoost Demand Forecasting**: Predict future demand for specific categories
+            - **Top Selling Categories Analysis**: Identify best performing categories by revenue, sales, and profit
 
-Available categories: Office Supplies, Technology, Furniture, Sporting
+            Available categories: Office Supplies, Technology, Furniture, Sporting
 
-You can forecast demand using different scenarios:
-- Conservative: Assumes lower prices and higher discounts
-- Standard: Uses historical averages
-- Optimistic: Assumes higher prices and lower discounts
+            You can forecast demand using different scenarios:
+            - Conservative: Assumes lower prices and higher discounts
+            - Standard: Uses historical averages
+            - Optimistic: Assumes higher prices and lower discounts
 
-When users ask about forecasting, demand prediction, sales trends, or inventory planning, use the forecast_category_demand function to provide accurate predictions.
+            When users ask about:
+            - Future predictions/demand → use forecast_category_demand
+            - Top performers/best sellers/popular categories → use identify_top_selling_categories
+            - Mixed queries → use both functions as needed
 
-Always explain your forecasts in business terms and provide actionable insights."""
+            Always explain your forecasts in business terms and provide actionable insights."""
 
             # Prepare the conversation using simple string format
             full_message = f"{system_prompt}\n\nUser: {user_message}"
@@ -368,40 +497,74 @@ Always explain your forecasts in business terms and provide actionable insights.
                             # Format the response
                             if result["success"]:
                                 forecast_text = f"""
-🔮 **DEMAND FORECAST RESULTS**
+                                    🔮 **DEMAND FORECAST RESULTS**
 
-**Category:** {result['category']}
-**Target Month:** {result['target_month']}
-**Scenario:** {result['scenario'].title()}
+                                    **Category:** {result['category']}
+                                    **Target Month:** {result['target_month']}
+                                    **Scenario:** {result['scenario'].title()}
 
-**📊 PREDICTION:**
-• **Total Predicted Demand:** {result['total_predicted_demand']} units
-• **Average per Subcategory:** {result['average_per_subcategory']} units
+                                    **📊 PREDICTION:**
+                                    • **Total Predicted Demand:** {result['total_predicted_demand']} units
+                                    • **Average per Subcategory:** {result['average_per_subcategory']} units
 
-**📋 SUBCATEGORY BREAKDOWN:**"""
+                                    **📋 SUBCATEGORY BREAKDOWN:**"""
                                 for sub in result['subcategory_breakdown']:
                                     forecast_text += f"\n• {sub['subcategory']}: {sub['predicted_demand']} units"
                                 
                                 forecast_text += f"""
 
-**⚙️ PARAMETERS USED:**
-• Average Price: ${result['parameters_used']['avg_price']}
-• Customer Segment: {result['parameters_used']['customer_segment']}
-• Discount Rate: {result['parameters_used']['discount_rate']*100:.1f}%
-• Historical Data: {'✅ Available' if result['parameters_used']['historical_data_available'] else '❌ Not Available'}
-• Historical Orders: {result['parameters_used']['historical_orders']}
+                                    **⚙️ PARAMETERS USED:**
+                                    • Average Price: ${result['parameters_used']['avg_price']}
+                                    • Customer Segment: {result['parameters_used']['customer_segment']}
+                                    • Discount Rate: {result['parameters_used']['discount_rate']*100:.1f}%
+                                    • Historical Data: {'Available' if result['parameters_used']['historical_data_available'] else '❌ Not Available'}
+                                    • Historical Orders: {result['parameters_used']['historical_orders']}
 
-**📈 BUSINESS INSIGHTS:**
-Based on this forecast, I recommend:
-1. **Inventory Planning:** Stock approximately {result['total_predicted_demand']} units for {result['target_month']}
-2. **Scenario Analysis:** This {result['scenario']} scenario prediction helps with risk assessment
-3. **Category Focus:** {result['model_info']['subcategories_predicted']} subcategories were analyzed for comprehensive coverage
+                                    **📈 BUSINESS INSIGHTS:**
+                                    Based on this forecast, I recommend:
+                                    1. **Inventory Planning:** Stock approximately {result['total_predicted_demand']} units for {result['target_month']}
+                                    2. **Scenario Analysis:** This {result['scenario']} scenario prediction helps with risk assessment
+                                    3. **Category Focus:** {result['model_info']['subcategories_predicted']} subcategories were analyzed for comprehensive coverage
 
-The model used {result['model_info']['aggregation_method']} aggregation method and mapped your category to {result['model_info']['mapped_from']} for prediction."""
+                                    The model used {result['model_info']['aggregation_method']} aggregation method and mapped your category to {result['model_info']['mapped_from']} for prediction."""
 
                                 return forecast_text
                             else:
-                                return f"❌ Forecast Error: {result['error']}"
+                                return f"Forecast Error: {result['error']}"
+                            
+                        elif function_call.name == "identify_top_selling_categories":
+                            args = function_call.args
+                            result = self.identify_top_selling_categories(**args)
+                            
+                            if result["success"]:
+                                if not result["top_categories"]:
+                                    return "📊 No sales data found for the analysis period."
+                                
+                                response = f"""TOP SELLING CATEGORIES (Last {result['analysis_period']})
+PERFORMANCE RANKINGS:
+"""
+                                
+                                for i, cat in enumerate(result["top_categories"], 1):
+                                    response += f"""
+#{i}. {cat['category']}
+• Revenue: ${cat['total_revenue']:,}
+• Sales: {cat['total_sales']} units
+• Profit: ${cat['total_profit']:,}
+• Orders: {cat['order_count']}
+• Avg Order Value: ${cat['avg_order_value']}
+• Profit Margin: {cat['profit_margin']:.1f}%
+"""
+
+                                response += f"""
+Overall
+• Best Performer: **{result['summary']['best_performer']['category']}**
+• Total Revenue: ${result['summary']['total_revenue_analyzed']:,}
+• Total Orders: {result['summary']['total_orders_analyzed']}
+• Categories Analyzed: {result['total_categories_analyzed']}
+"""
+                                return response
+                            else:
+                                return f"❌ Error analyzing top sellers: {result['error']}"
                     
                     elif hasattr(part, 'text') and part.text:
                         return part.text
@@ -442,7 +605,7 @@ def interactive_chat(forecaster: GeminiForecaster):
             user_input = input("\n💬 You: ").strip()
             
             # Check for exit commands
-            if user_input.lower() in ['quit', 'exit', 'bye', 'q']:
+            if user_input.lower() in ['quit', 'exit', 'bye', 'q', 'exit', 'thanks', 'thank you']:
                 print("\n👋 Thanks for using GenAI Forecasting! Goodbye!")
                 break
             
