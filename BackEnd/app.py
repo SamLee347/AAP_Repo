@@ -91,32 +91,6 @@ def disposal_prediction():
     finally:
         session.close()
 
-
-# ====================================== #
-
-
-@app.route("/inventory", methods=["GET"])
-def get_inventory():
-    """Endpoint to get all inventory items"""
-    session = SessionLocal()
-    inventory_items = session.query(Inventory).all()
-    result = [item.to_dict() for item in inventory_items]
-    session.close()
-    return jsonify(result)
-
-
-@app.route("/orders", methods=["GET"])
-def get_orders():
-    """Endpoint to get all orders"""
-    session = SessionLocal()
-    # Eagerly load the inventory_item relationship
-    orders = session.query(Order).options(joinedload(Order.inventory_item)).all()
-    # Convert to dict while session is still open
-    result = [order.to_dict() for order in orders]
-    session.close()
-    return jsonify(result)
-
-
 @app.route("/predictLocation", methods=["POST"])
 def predict_location():
     """Endpoint to predict the location of an inventory item"""
@@ -249,7 +223,126 @@ def predict_location():
         session.close()
         logger.info("Database session closed")
 
-    # return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
+
+
+@app.route("/sales-forecast", methods=["POST"])
+def sales_forecast():
+    from Supervised_Models.ShernFai.model_functions import forecast_generalized_category_auto, category_mapping, preprocessor_data
+    session = SessionLocal()
+    data = request.json
+    
+    try:
+        if not data or 'item_id' not in data or 'month' not in data:
+            return jsonify({"error": "Missing required fields: item_id and month"}), 400
+        
+        # Get item from database
+        item = session.query(Inventory).filter_by(ItemId=data["item_id"]).first()
+        if not item:
+            return jsonify({"error": "Item not found"}), 404
+        
+        # Get related orders to calculate LIVE features
+        orders = session.query(Order).filter_by(ItemId=data["item_id"]).all()
+        
+        # Calculate LIVE features from your database
+        live_features = calculate_live_features(item, orders)
+        
+        # Use the ORIGINAL function but provide LIVE features as parameters
+        result = forecast_generalized_category_auto(
+            model=FORECAST_MODEL,
+            le_category=preprocessor_data['label_encoder_category'],
+            reference_date=preprocessor_data['reference_date'],
+            future_year_month=data['month'],
+            generalized_category=item.ItemCategory,
+            category_mapping=category_mapping,
+            feature_columns=preprocessor_data['feature_columns'],
+            description=data.get('description', ''),
+            # OVERRIDE the auto-calculation by providing specific features
+            avg_price=live_features['avg_price'],
+            customer_segment=live_features['dominant_segment'],
+            discount_rate=live_features['avg_discount_rate']
+        )
+        
+        return jsonify({
+            'success': True,
+            'result': {
+                'item_name': item.ItemName,
+                'item_id': item.ItemId,
+                'features_used': live_features,  # Show what live data was used
+                'total_prediction': round(result['total_prediction'], 2),
+                'mean_prediction': round(result['mean_prediction'], 2),
+                'subcategory_predictions': result['subcategory_predictions'],
+                'num_subcategories': result['num_subcategories'],
+                'formatted_month': pd.to_datetime(data['month']).strftime('%B %Y'),
+                'data_source': 'live_database',
+                'success_message': f"✅ LIVE Forecast: {result['total_prediction']:.2f} units based on current data"
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error during sales forecast: {e}")
+        return jsonify({"error": f"Sales forecast failed: {str(e)}"}), 500
+    finally:
+        session.close()
+
+def calculate_live_features(item, orders):
+    """Calculate features from live database data"""
+    if not orders:
+        # If no orders, use item data or sensible defaults
+        return {
+            'avg_price': item.Price if item.Price else 25.50,
+            'dominant_segment': 'Consumer',
+            'avg_discount_rate': 0.08,
+            'data_quality': 'defaults_used',
+            'order_count': 0
+        }
+    
+    # Calculate from actual orders
+    prices = [order.Price for order in orders if order.Price]
+    discount_rates = [
+        order.Discount / order.Price 
+        for order in orders 
+        if order.Discount and order.Price and order.Price > 0
+    ]
+    segments = [order.CustomerSegment for order in orders if order.CustomerSegment]
+    
+    return {
+        'avg_price': np.mean(prices) if prices else (item.Price if item.Price else 25.50),
+        'dominant_segment': max(set(segments), key=segments.count) if segments else 'Consumer',
+        'avg_discount_rate': np.mean(discount_rates) if discount_rates else 0.08,
+        'data_quality': 'live_orders',
+        'order_count': len(orders),
+        'first_order_date': min(order.DateOrdered for order in orders) if orders else None,
+        'last_order_date': max(order.DateOrdered for order in orders) if orders else None
+    }
+
+
+# ====================================== #
+
+
+@app.route("/inventory", methods=["GET"])
+def get_inventory():
+    """Endpoint to get all inventory items"""
+    session = SessionLocal()
+    inventory_items = session.query(Inventory).all()
+    result = [item.to_dict() for item in inventory_items]
+    session.close()
+    return jsonify(result)
+
+
+@app.route("/orders", methods=["GET"])
+def get_orders():
+    """Endpoint to get all orders"""
+    session = SessionLocal()
+    # Eagerly load the inventory_item relationship
+    orders = session.query(Order).options(joinedload(Order.inventory_item)).all()
+    # Convert to dict while session is still open
+    result = [order.to_dict() for order in orders]
+    session.close()
+    return jsonify(result)
+
+
+
+
 
 
 # GENERATIVE MODELS
