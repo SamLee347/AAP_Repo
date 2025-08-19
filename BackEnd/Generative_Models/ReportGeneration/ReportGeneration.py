@@ -23,11 +23,29 @@
 # - Disposal Risk Prediction (Kendrick's Model)
 # - Sales Forecasting (ShernFai's Model)
 
-from google import genai
 import os
-from dotenv import load_dotenv
+import pickle
+import subprocess
+import sys
+import traceback
+from datetime import datetime
+from pathlib import Path
 
-load_dotenv()
+import joblib
+import numpy as np
+import pandas as pd
+from dateutil.relativedelta import relativedelta
+from dotenv import load_dotenv
+from google import genai
+from markdown_pdf import MarkdownPdf, Section
+
+parent_dir = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(parent_dir))
+
+from Database.db import SessionLocal
+from Database_Table import Inventory, Order
+
+load_dotenv(dotenv_path=os.path.join(parent_dir, ".env"))
 
 # Security Note: For production use, store API key as environment variable
 # For development/demo purposes:
@@ -41,23 +59,9 @@ MODEL_ID = "gemini-2.5-flash" # @param ["gemini-2.5-flash-lite","gemini-2.5-flas
 # # Data
 
 # ## Database Integration
-import numpy as np
-import pandas as pd
-import os
-import sys
-from pathlib import Path
-
-# Configuration
 DEBUG_MODE = False  # Set to True for debugging output
 
-parent_dir = Path(__file__).resolve().parent.parent.parent
-print(parent_dir)
-sys.path.append(str(parent_dir))
-
 try:
-    from Database.db import SessionLocal
-    from Database_Table import Inventory, Order
-
     def getDbContent():
         """
         Retrieves inventory and order data from the database.
@@ -129,17 +133,6 @@ orderData = dbtoList(order)
 
 
 # ## Supervised Models
-
-
-
-import pickle
-import joblib
-import numpy as np
-import pandas as pd
-import os
-from datetime import datetime
-from IPython.display import Markdown
-from sklearn.metrics import classification_report, confusion_matrix
 
 # Configuration
 DEBUG_MODE = False  # Set to True for debugging output
@@ -554,8 +547,6 @@ s = Supervised_Models()
 
 
 # Products Overview: Comprehensive inventory analysis using real database data
-from datetime import datetime, timedelta
-import pandas as pd
 
 print("📦 Generating Products Overview Section...")
 
@@ -973,10 +964,6 @@ except Exception as e:
 
 
 # Sales Insights: Comprehensive analysis using real database data
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-import pandas as pd
-
 print("💰 Generating Sales Insights Section...")
 
 try:
@@ -1925,7 +1912,6 @@ try:
 except Exception as e:
     print(f"❌ Error generating complete report: {e}")
     print("Please check that all previous sections have been generated successfully.")
-    import traceback
     traceback.print_exc()
 
 
@@ -1936,9 +1922,6 @@ except Exception as e:
 print("⚡ Creating PDF using your friend's approach...")
 
 try:
-    from markdown_pdf import MarkdownPdf, Section
-    from datetime import datetime
-
     current_date = datetime.now()
 
     # Create monthly report using the exact format your friend used
@@ -1978,7 +1961,6 @@ try:
 
 except ImportError:
     print("📦 Installing markdown-pdf...")
-    import subprocess
     subprocess.check_call(['pip', 'install', 'markdown-pdf'])
     print("✅ Please run this cell again after installation")
 
