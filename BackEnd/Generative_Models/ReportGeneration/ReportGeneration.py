@@ -617,6 +617,7 @@ try:
         4. **Summary Statistics**: Include metrics like average quantities per category, storage utilization across locations
 
         Format this as a professional business report section with clear headings and actionable insights.
+        Current Date: {current_date.strftime('%Y-%m-%d')}
         """
 
         section_products_overview = client.models.generate_content(
@@ -1632,7 +1633,7 @@ try:
     # Calculate overall metrics
     total_items = len(inventory_data) if inventory_data else 0
     total_orders = len(order_data) if order_data else 0
-    total_value = sum(item.get('UnitsSold', 0) * item.get('Price', 0) for item in inventory_data) if inventory_data else 0
+    total_sold = sum(item.get('UnitsSold', 0) for item in inventory_data) if inventory_data else 0
     total_quantity = sum(item.get('Quantity', 0) for item in inventory_data) if inventory_data else 0
 
     # Category analysis summary
@@ -1678,7 +1679,7 @@ try:
     **OVERALL METRICS:**
     - Total inventory items analyzed: {total_items}
     - Total orders processed: {total_orders}
-    - Total inventory value: ${total_value:,.2f}
+    - Total inventory items sold: ${total_sold:,.2f}
     - Total units in stock: {total_quantity:,}
     - Total order value: ${order_value:,.2f}
     - Average order value: ${avg_order_value:,.2f}
@@ -1746,6 +1747,8 @@ try:
 
     Format this as an executive-level summary suitable for senior management review and decision-making.
     The tone should be professional, data-driven, and focused on actionable business insights.
+
+    Current Date: {current_date.strftime('%Y-%m-%d')}
     """
 
     section_summary = client.models.generate_content(
@@ -1951,9 +1954,12 @@ try:
     print("📄 Generating PDF...")
 
     # Create PDF exactly like your friend did
+    reports_dir = os.path.join(os.getcwd(), "Reports")
+    os.makedirs(reports_dir, exist_ok=True)
+    pdf_path = os.path.join(reports_dir, f"MonthlyReport_({current_date.date()}).pdf")
     pdf = MarkdownPdf(toc_level=1)
     pdf.add_section(Section(monthly_report))
-    pdf.save(f"MonthlyReport_({current_date.date()}).pdf")
+    pdf.save(pdf_path)
 
     print(f"🎉 SUCCESS!")
     print(f"📁 PDF saved as: MonthlyReport_({current_date.date()}).pdf")

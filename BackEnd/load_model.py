@@ -28,7 +28,7 @@ def load_report_generation_model():
         check=True,
         cwd=MODEL_DIR.parent / "Generative_Models" / "ReportGeneration"
     )
-    return "Report generation script executed."
+    return "Report generated successfully!"
 
 # Initialize models at startup
 DISPOSAL_MODEL = load_disposal_model()
