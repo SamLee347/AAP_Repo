@@ -22,7 +22,7 @@
 # - Storage Prediction (Samuel's Model) 
 # - Disposal Risk Prediction (Kendrick's Model)
 # - Sales Forecasting (ShernFai's Model)
-
+# Basically converting the .ipynb file to .py
 import os
 import pickle
 import subprocess
