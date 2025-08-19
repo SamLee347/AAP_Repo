@@ -1,7 +1,7 @@
 import datetime
 import os
 from sqlalchemy.orm import joinedload
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory, abort
 from flask_cors import CORS
 from Generative_Models.ChatBot.unifiedChatbot import create_unified_chatbot
 from Database.db import SessionLocal, init_db
@@ -10,7 +10,6 @@ from Database_Table.order import Order
 from Generative_Models.ChatBot.nlpQuery import query_gemini
 from mockdata import populate_test_data
 from datetime import datetime
-import numpy as np
 
 # Supervised Models
 from load_model import (
@@ -352,6 +351,26 @@ def get_orders():
 def generate_report():
     return REPORT_GENERATION_MODEL()
 
+@app.route("/list-reports", methods=["GET"])
+def list_reports():
+    """Return a list of all filenames in Generative_Models/ReportGeneration/Reports"""
+    reports_dir = Path(__file__).parent / "Generative_Models" / "ReportGeneration" / "Reports"
+    try:
+        if not reports_dir.exists() or not reports_dir.is_dir():
+            return jsonify({"error": "Reports directory not found"}), 404
+        filenames = [f.name for f in reports_dir.iterdir() if f.is_file()]
+        return jsonify(filenames)
+    except Exception as e:
+        logger.error(f"Error listing reports: {str(e)}")
+        return jsonify({"error": "Failed to list reports"}), 500
+
+@app.route("/Reports/<path:filename>")
+def serve_report(filename):
+    try:
+        return send_from_directory('Generative_Models/ReportGeneration/Reports', filename, mimetype="application/pdf")
+    except FileNotFoundError:
+        # If the file doesn't exist, return 404
+        abort(404)
 
 # CHATBOT BACKEND
 # ---------------------------------------------------------------------------

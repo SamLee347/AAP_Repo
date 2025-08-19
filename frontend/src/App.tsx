@@ -7,6 +7,7 @@ import { InventoryView } from "./components/views/InventoryView"
 import { OrdersView } from "./components/views/OrdersView"
 import { ChatView } from "./components/views/ChatView"
 import { ReportsView } from "./components/views/ReportsView"
+import { ReportGenView } from "./components/views/ReportGenView"
 import { AIPanel } from "./components/AIPanel"
 import { useInventoryData } from "./hooks/useInventoryData"
 import "./App.css"
@@ -101,7 +102,8 @@ function App() {
 
             {activeView === "chat" && <ChatView />}
 
-            {activeView === "reports" && <ReportsView />}
+            {/* {activeView === "reports" && <ReportsView />} */}
+            {activeView === "reports" && <ReportGenView />}
           </div>
 
           {selectedItem && (activeView === "inventory" || activeView === "orders") && (
