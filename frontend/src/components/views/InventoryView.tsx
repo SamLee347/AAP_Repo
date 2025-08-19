@@ -62,7 +62,13 @@ export function InventoryView({ inventory, selectedItem, onItemSelect }: Invento
                 <td className="font-weight-500">{item.Location}</td>
                 <td className="font-weight-500">{item.Date}</td>
                 <td className="font-weight-500">
-                  <input type="checkbox" checked={item.Dispose ?? false} readOnly />
+                  <input
+                    type="checkbox"
+                    checked={item.Dispose ?? false}
+                    readOnly
+                    title="Mark item for disposal"
+                    aria-label="Mark item for disposal"
+                  />
                 </td>
                 <td>
                   <button className="btn padding-4-8" title="More actions">
