@@ -12,7 +12,7 @@ from mockdata import populate_test_data
 import numpy as np
 
 #Supervised Models
-from load_model import DISPOSAL_MODEL, STORAGE_MODEL, FORECAST_MODEL, CATEGORY_MODEL
+from load_model import DISPOSAL_MODEL, STORAGE_MODEL, FORECAST_MODEL, CATEGORY_MODEL, REPORT_GENERATION_MODEL
 import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -241,6 +241,12 @@ def predict_location():
         logger.info("Database session closed")
         
     # return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
+# GENERATIVE MODELS
+# REPORT GENERATION
+# ---------------------------------------------------------------------------
+@app.route("/generateReport", methods=["POST"])
+def generate_report():
+    return REPORT_GENERATION_MODEL()
 
 # CHATBOT BACKEND
 # ---------------------------------------------------------------------------

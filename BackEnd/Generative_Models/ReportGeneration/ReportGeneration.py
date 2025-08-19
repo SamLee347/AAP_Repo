@@ -45,12 +45,14 @@ import numpy as np
 import pandas as pd
 import os
 import sys
+from pathlib import Path
 
 # Configuration
 DEBUG_MODE = False  # Set to True for debugging output
 
-# Add parent directories to path for module imports
-sys.path.append('../../')
+parent_dir = Path(__file__).resolve().parent.parent.parent
+print(parent_dir)
+sys.path.append(str(parent_dir))
 
 try:
     from Database.db import SessionLocal
@@ -84,9 +86,6 @@ except ImportError as e:
     print(f"Database import error: {e}")
     print("Database modules not available - using empty data")
     inventory, order = [], []
-
-
-# In[5]:
 
 
 def dbtoList(records):
@@ -131,7 +130,6 @@ orderData = dbtoList(order)
 
 # ## Supervised Models
 
-# In[6]:
 
 
 import pickle
