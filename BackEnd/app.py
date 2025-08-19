@@ -1,10 +1,22 @@
+import datetime
+import os
 from sqlalchemy.orm import joinedload
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+from Generative_Models.ChatBot.unifiedChatbot import create_unified_chatbot
 from Database.db import SessionLocal, init_db
 from Database_Table.inventory import Inventory
 from Database_Table.order import Order
 from Generative_Models.ChatBot.nlpQuery import query_gemini
+from mockdata import populate_test_data
+import numpy as np
+
+#Supervised Models
+from load_model import DISPOSAL_MODEL, STORAGE_MODEL, FORECAST_MODEL, CATEGORY_MODEL
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 import pickle
 import numpy as np
 import pandas as pd
@@ -12,105 +24,47 @@ import sys
 import os
 
 
+
 app = Flask(__name__)
 CORS(app)
 
+# ======== Supervised Model =========== #
 
-def populate_test_data():
+@app.route('/disposal-prediction', methods=['POST'])
+def disposal_prediction():
+    logger.debug("Request received: %s", request.json)
+    
     session = SessionLocal()
+    try:
+        item = session.query(Inventory).filter_by(ItemId=request.json['item_id']).first()
+        if not item:
+            return jsonify({"error": "Item not found"}), 404
 
-    # Clear existing data (important for testing)
-    session.query(Order).delete()
-    session.query(Inventory).delete()
+        features = item.get_disposal_features()
+        logger.debug("Features shape: %s", np.array(features).shape)
+        
+        model = DISPOSAL_MODEL['model']
+        prediction = model.predict([features])[0]  # Get single prediction
+        proba = model.predict_proba([features])[0] if hasattr(model, 'predict_proba') else None  # Fixed
+        
+        response = {
+            "recommendation": "DISPOSE" if prediction >= DISPOSAL_MODEL['threshold'] else "KEEP",
+            "confidence": float(max(proba)) if proba is not None else None,  # Now safe
+            "reasons": [
+                f"Quantity: {item.ItemQuantity}",
+                f"Sales: {item.UnitsSold}",
+                f"Turnover: {(item.UnitsSold/item.ItemQuantity):.2f}" if item.ItemQuantity else "N/A"
+            ]
+        }
+        return jsonify(response)
+        
+    except Exception as e:
+        logger.exception("Prediction failed")
+        return jsonify({"error": "Prediction service unavailable"}), 500
+    finally:
+        session.close()
+# ====================================== #
 
-    # Create Inventory test items
-    electronics = Inventory(
-        ItemId=101,
-        ItemName="Smartphone",
-        Location="A-1",
-        Date="2025-06-01",
-        ItemQuantity=100,
-        ItemCategory="Technology",
-        UnitsSold=50,
-        Weight=1.5,
-        Size="Small",
-        Priority="High",
-        Dispose=False,
-    )
-
-    clothing = Inventory(
-        ItemId=102,
-        ItemName="T-Shirt",
-        Location="B-5",
-        Date="2025-07-01",
-        ItemQuantity=200,
-        ItemCategory="Clothing",
-        UnitsSold=100,
-        Weight=2.0,
-        Size="Medium",
-        Priority="Medium",
-        Dispose=False,
-    )
-
-    Clothes = Inventory(
-        ItemId=103,
-        ItemName="Winter Jacket",
-        Location="C-3",
-        Date="2025-08-01",
-        ItemQuantity=150,
-        ItemCategory="Clothing",
-        UnitsSold=75,
-        Weight=15.0,
-        Size="Large",
-        Priority="Low",
-        Dispose=True,
-    )
-
-    # Create Orders that reference these inventory items
-    orders = [
-        Order(
-            OrderId=1001,
-            ItemId=101,  # References electronics ItemId
-            OrderQuantity=10,
-            Sales=5000,
-            Price=500,
-            Discount=50,
-            Profit=4500,
-            DateOrdered="2025-06-15",
-            DateReceived="2025-06-20",
-            CustomerSegment="Corporate",
-        ),
-        Order(
-            OrderId=1002,
-            ItemId=102,  # References clothing ItemId
-            OrderQuantity=20,
-            Sales=2000,
-            Price=100,
-            Discount=20,
-            Profit=1980,
-            DateOrdered="2025-07-10",
-            DateReceived="2025-07-12",
-            CustomerSegment="Retail",
-        ),
-        Order(
-            OrderId=1003,
-            ItemId=101,  # References electronics ItemId again
-            OrderQuantity=5,
-            Sales=2500,
-            Price=500,
-            Discount=25,
-            Profit=2475,
-            DateOrdered="2025-08-05",
-            DateReceived="2025-08-10",
-            CustomerSegment="Wholesale",
-        ),
-    ]
-
-    # Add to session and commit
-    session.add_all([electronics, clothing, Clothes])
-    session.add_all(orders)
-    session.commit()
-    session.close()
 
 @app.route("/inventory", methods=["GET"])
 def get_inventory():
@@ -159,56 +113,220 @@ def test_chatbot():
 
     return jsonify({"tests": results})
 
-
 @app.route("/predictLocation", methods=["POST"])
 def predict_location():
     """Endpoint to predict the location of an inventory item"""
+    logger.info("Starting location prediction request")
+    session = SessionLocal()
     input_data = request.json
-
-    # Call the AI model for prediction (mocked response here)
-    with open('BackEnd/Supervised_Models/Samuel/storage_prediction_model.pkl', 'rb') as file:
-        storage_prediction_model = pickle.load(file)
-            
-    categorical_features = {
-        'Priority': ['High','Low','Medium'],
-        'Product_Type': ['Clothing','Technology','Other','Sports and Fitness'],
-        'Size': ['Large','Medium','Small']
-    }
-    numerical_features = ['Order_Quantity', 'Weight']
-    one_hot_columns = []
     
-    for feature, values in categorical_features.items():
-        for value in values:
-            one_hot_columns.append(f"{feature}_{value}")
+    try:
+        # Validate input
+        if not input_data or 'item_id' not in input_data:
+            logger.error("Missing item_id in request")
+            return jsonify({"error": "item_id is required"}), 400
+
+        logger.debug(f"Input data received: {input_data}")
+
+        # Database operations
+        logger.info(f"Querying database for item_id: {input_data['item_id']}")
+        item = session.query(Inventory).filter_by(ItemId=input_data['item_id']).first()
+        orders = session.query(Order).filter_by(ItemId=input_data['item_id']).all()
+
+        if not item:
+            logger.warning(f"Item not found: {input_data['item_id']}")
+            return jsonify({"error": "Item not found"}), 404
+
+        logger.info(f"Found item: {item.ItemId} with {len(orders)} orders")
+
+        # Model loading
+        model_path = 'Supervised_Models/Samuel/storage_prediction_model.pkl'
+        logger.info(f"Loading model from: {model_path}")
         
-    # Combine with numerical features to get all feature names
-    all_feature_names = one_hot_columns + numerical_features
+        try:
+            with open(model_path, 'rb') as file:
+                storage_prediction_model = pickle.load(file)
+            logger.debug("Model loaded successfully")
+        except Exception as e:
+            logger.error(f"Model loading failed: {str(e)}")
+            return jsonify({"error": "Model loading failed"}), 500
 
-    features_dict = {col: 0 for col in all_feature_names}
+        # Define all expected features (this should match your training data)
+        # You need to know what features the model was trained with
+        # This is just an example - adjust according to your actual model
+        expected_categories = {
+            'Priority': ['High', 'Low', 'Medium'],
+            'Product_Type': ['Clothing', 'Electronics', 'Home Goods', 'Sports'],
+            'Size': ['Large', 'Medium', 'Small']
+        }
+        
+        expected_numerical = ['Order_Quantity', 'Weight']
+        
+        # Initialize all features to 0
+        features = {}
+        
+        # Set up one-hot encoded features
+        for feature, categories in expected_categories.items():
+            for category in categories:
+                features[f"{feature}_{category}"] = 0
+        
+        # Add numerical features
+        for feature in expected_numerical:
+            features[feature] = 0
+        
+        # Now populate the actual values
+        try:
+            # Set the correct category to 1
+            if hasattr(item, 'Priority') and item.Priority in expected_categories['Priority']:
+                features[f"Priority_{item.Priority}"] = 1
+            
+            if hasattr(item, 'Product_Type') and item.Product_Type in expected_categories['Product_Type']:
+                features[f"Product_Type_{item.Product_Type}"] = 1
+            
+            if hasattr(item, 'Size') and item.Size in expected_categories['Size']:
+                features[f"Size_{item.Size}"] = 1
+            
+            # Set numerical features
+            features['Order_Quantity'] = sum(order.OrderQuantity for order in orders)
+            features['Weight'] = item.Weight
+            
+            # Create feature array in correct order (this must match training)
+            # You might need to save the feature order when training the model
+            feature_names = sorted(features.keys())
+            feature_values = [features[name] for name in feature_names]
+            
+            features_array = np.array(feature_values).reshape(1, -1)
+            logger.debug(f"Final feature array shape: {features_array.shape}")
+            
+        except Exception as e:
+            logger.error(f"Feature processing failed: {str(e)}")
+            return jsonify({"error": "Feature processing failed"}), 500
 
-    # Set one-hot encoded features
-    for feature, values in categorical_features.items():
-        if feature in input_data:
-            selected_value = input_data[feature]
-            one_hot_col = f"{feature}_{selected_value}"
-            if one_hot_col in features_dict:
-                features_dict[one_hot_col] = 1
+        # Prediction
+        logger.info("Making prediction")
+        try:
+            prediction = storage_prediction_model.predict(features_array)
+            probabilities = storage_prediction_model.predict_proba(features_array)[0]
+            class_labels = storage_prediction_model.classes_
+            
+            logger.debug(f"Raw prediction: {prediction}")
+            logger.debug(f"Class probabilities: {probabilities}")
+            
+            prob_dict = {str(label): float(prob) for label, prob in zip(class_labels, probabilities)}
+            logger.info(f"Prediction probabilities: {prob_dict}")
+            
+            response = {
+                "recommendation": str(prediction[0]),
+                "confidence": prob_dict[str(prediction[0])],
+                "reasons": [
+                    f"Priority: {item.Priority}",
+                  f"Total Orders: {len(orders)}",
+                    f"Weight: {item.Weight}"
+                ]
+            }
+            
+            logger.info(f"Successful prediction: {response}")
+            return jsonify(response)
+            
+        except Exception as e:
+            logger.error(f"Prediction failed: {str(e)}")
+            return jsonify({"error": "Prediction failed"}), 500
 
-    # Set numerical features
-    for feature in numerical_features:
-        if feature in input_data:
-            features_dict[feature] = float(input_data[feature])
+    except Exception as e:
+        logger.exception("Unexpected error in predict_location")
+        return jsonify({"error": "Internal server error"}), 500
+        
+    finally:
+        session.close()
+        logger.info("Database session closed")
+        
+    # return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
+
+# CHATBOT BACKEND
+# ---------------------------------------------------------------------------
+try:
+    API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyBR-BJNTA4HSiK3b0iKmz-NZnVvSbeXCMw')
+    unified_chatbot = create_unified_chatbot(API_KEY)
+    print("✅ Unified chatbot initialized successfully")
+except Exception as e:
+    print(f"❌ Error initializing unified chatbot: {e}")
+    unified_chatbot = None
+
+# ... existing routes ...
+@app.route("/chat", methods=["POST", "GET"])
+def unified_chat_endpoint():
+    """Single endpoint for ALL chatbot functionality with intent recognition"""
+    if request.method == "GET":
+        # Serve the chat interface
+        return render_template('chat.html')
     
-    # Convert to array in the correct order
-    features_array = np.array([features_dict[col] for col in all_feature_names]).reshape(1, -1)
+    try:
+        if not unified_chatbot:
+            return jsonify({
+                "success": False,
+                "error": "Chatbot service not available",
+                "response": "Sorry, the AI assistant is currently unavailable. Please try again later."
+            }), 503
+        
+        data = request.get_json()
+        
+        if not data or 'message' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing message in request",
+                "response": "Please provide a message to process."
+            }), 400
+        
+        user_message = data['message'].strip()
+        
+        if not user_message:
+            return jsonify({
+                "success": False,
+                "error": "Empty message",
+                "response": "Please enter a valid question."
+            }), 400
+        
+        # Let the unified chatbot handle EVERYTHING - it will determine intent automatically
+        response = unified_chatbot.chat_with_unified_intelligence(user_message)
+        
+        # Simple, clean response
+        return jsonify({
+            "success": True,
+            "message": user_message,
+            "response": response,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "chatbot_type": "unified_intelligence"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "response": f"An error occurred while processing your request: {str(e)}"
+        }), 500
 
-    prediction = storage_prediction_model.predict(features_array)
+@app.route("/chat/status", methods=["GET"])
+def chat_status():
+    """Simple status check endpoint"""
+    return jsonify({
+        "success": True,
+        "chatbot_available": unified_chatbot is not None,
+        "capabilities": [
+            "Demand Forecasting",
+            "Trend Analysis", 
+            "Database Querying",
+            "Business Intelligence"
+        ],
+        "example_queries": [
+            "Forecast Technology demand for March 2025",
+            "Which categories are declining?",
+            "Show me recent orders for electronics",
+            "What's our best selling category?",
+            "Predict Office Supplies with optimistic scenario"
+        ]
+    })
+# ---------------------------------------------------------------------------
 
-    probabilities = storage_prediction_model.predict_proba(features_array)[0]
-    class_labels = storage_prediction_model.classes_
-    prob_dict = {str(label): float(prob) for label, prob in zip(class_labels, probabilities)}
-
-    return {'PredictedLocation': prediction[0], 'Confidence': prob_dict[prediction[0]]}
 
 @app.route("/")
 def home():
@@ -227,3 +345,4 @@ if __name__ == "__main__":
 
     app.run(debug=True, port=5000)
     print("Flask app running on port 5000")
+
