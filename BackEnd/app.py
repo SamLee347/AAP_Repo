@@ -149,7 +149,7 @@ def predict_location():
         # This is just an example - adjust according to your actual model
         expected_categories = {
             "Priority": ["High", "Low", "Medium"],
-            "Product_Type": ["Clothing", "Electronics", "Home Goods", "Sports"],
+            "Product_Type": ["Clothing", "Technology", "Other", "Sports and Fitness"],
             "Size": ["Large", "Medium", "Small"],
         }
 

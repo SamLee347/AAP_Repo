@@ -106,12 +106,12 @@ def populate_test_data():
             Profit=2475,
             DateOrdered="2025-08-05",
             DateReceived="2025-08-10",
-            CustomerSegment="Wholesale",
+            CustomerSegment="Home Office",
         ),
     ]
 
     # Add to session and commit
-    session.add_all([electronics, clothing, Clothes, Big])
+    session.add_all([technology, clothing, Clothes, Big])
     session.add_all(orders)
     session.commit()
     session.close()
