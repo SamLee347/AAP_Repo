@@ -47,7 +47,7 @@ def populate_test_data():
         ItemQuantity=150,
         ItemCategory="Clothing",
         UnitsSold=3000,
-        Weight=15.0,
+        Weight=2.5,
         Size="Large",
         Priority="Low",
         DemandForecast=2000,  # Example lag feature
@@ -57,15 +57,15 @@ def populate_test_data():
 
     Big = Inventory(
         ItemId=104,
-        ItemName="Cool Clothes",
+        ItemName="T-Shirt",
         Date="2025-08-01",
-        ItemQuantity=3000,
+        ItemQuantity=20,
         ItemCategory="Clothing",
-        UnitsSold=75,
-        Weight=15.0,
+        UnitsSold=12,
+        Weight=1.2,
         Size="Large",
         Priority="Low",
-        DemandForecast=100,  # Example lag feature
+        DemandForecast=10,  # Example lag feature
         Dispose=False,
         Location="C-6",
     )
