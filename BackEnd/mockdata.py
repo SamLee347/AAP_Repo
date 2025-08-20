@@ -59,16 +59,33 @@ def populate_test_data():
         ItemId=104,
         ItemName="T-Shirt",
         Date="2025-08-01",
-        ItemQuantity=20,
+        ItemQuantity=6,
         ItemCategory="Clothing",
         UnitsSold=12,
-        Weight=1.2,
+        Weight=5.29,
         Size="Large",
-        Priority="Low",
+        Priority="Medium",
+        DemandForecast=10,  # Example lag feature
+        Dispose=False,      
+        Location="A-3",
+    )
+    
+    Item1 = Inventory(
+        ItemId=104,
+        ItemName="T-Shirt",
+        Date="2025-08-01",
+        ItemQuantity=6,
+        ItemCategory="Clothing",
+        UnitsSold=12,
+        Weight=5.29,
+        Size="Large",
+        Priority="Medium",
         DemandForecast=10,  # Example lag feature
         Dispose=False,
-        Location="C-6",
+        Location="A-3",
     )
+    
+    
 
     # Create Orders that reference these inventory items
     orders = [
