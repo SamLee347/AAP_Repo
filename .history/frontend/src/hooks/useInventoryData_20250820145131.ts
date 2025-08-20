@@ -109,8 +109,8 @@ export function useInventoryData() {
         }
       } catch (error) {
         console.log("Using mock data - Flask API not available")
-        setInventory(mockInventory)
-        setOrders(mockOrders)
+        // setInventory(mockInventory)
+        // setOrders(mockOrders)
       } finally {
         setLoading(false)
       }

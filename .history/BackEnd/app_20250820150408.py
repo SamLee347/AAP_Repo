@@ -381,7 +381,7 @@ def categorize_item():
         
         # Calculate features
         feature_values = [
-            orders[0].Price if orders else 0,
+            orders[0].Price if orders else item.Price if item.Price else 0,
             sum(order.Sales for order in orders) if orders else 0,
             sum(order.Profit for order in orders) if orders else 0,
             item.Weight if item.Weight else 0.0,
@@ -393,41 +393,27 @@ def categorize_item():
         print(f"DEBUG: Raw prediction: {numeric_prediction}, type: {type(numeric_prediction)}")
         
         # Convert numeric prediction to category name
-        print(f"DEBUG: Raw prediction: {numeric_prediction}, type: {type(numeric_prediction)}")
-        
-        # The trained model was built with numeric string labels, not actual category names
-        # So we need to map from the model's weird outputs to meaningful main categories
-        model_label_to_category = {
-            '0': "Technology",
-            '3': "Clothing", 
-            '5': "Sports and Fitness",
-            '6': "Other",  # This includes Book Shop, Pet Shop, Health and Beauty, Fan Shop
-            '8': "Technology",
-            'Other': "Other"
-        }
-        
-        # Create fallback mapping based on prediction index for main categories
-        prediction_index_to_category = {
-            0: "Technology",           # Maps to label '0'
-            1: "Clothing",            # Maps to label '3'  
-            2: "Sports and Fitness",  # Maps to label '5'
-            3: "Other",               # Maps to label '6' <- This includes Book Shop, Pet Shop, etc.
-            4: "Technology",          # Maps to label '8'
-            5: "Other"                # Maps to label 'Other'
-        }
-        
         try:
-            # Try using the label encoder first
-            model_output = CATEGORY_MODEL['label_encoder'].inverse_transform([int(numeric_prediction)])[0]
-            print(f"DEBUG: Label encoder returned: '{model_output}' (type: {type(model_output)})")
-            # Now map the model's weird output to a real category name
-            category_name = model_label_to_category.get(str(model_output), f"Unknown_{model_output}")
-            print(f"DEBUG: Mapped to category: '{category_name}'")
+            category_name = CATEGORY_MODEL['label_encoder'].inverse_transform([int(numeric_prediction)])[0]
+            print(f"DEBUG: Successfully converted to: {category_name}")
         except Exception as e:
-            print(f"DEBUG: Label encoder failed ({e}), using fallback mapping")
-            # Use fallback mapping based on prediction index
-            category_name = prediction_index_to_category.get(int(numeric_prediction), f"Category_{int(numeric_prediction)}")
-            print(f"DEBUG: Fallback mapping result: '{category_name}'")
+            print(f"Error converting prediction {numeric_prediction}: {e}")
+            print(f"Available classes: {CATEGORY_MODEL['label_encoder'].classes_}")
+            # Create a mapping for common categories if the encoder fails
+            category_mapping = {
+                0: "Technology",
+                1: "Clothing", 
+                2: "Sports",
+                3: "Beauty",
+                4: "Home & Garden",
+                5: "Automotive",
+                6: "Books",
+                7: "Food & Beverages",
+                8: "Health",
+                9: "Office Supplies"
+            }
+            category_name = category_mapping.get(int(numeric_prediction), f"Category_{int(numeric_prediction)}")
+            print(f"DEBUG: Used fallback mapping: {category_name}")
         
         # Get confidence score
         confidence = 80.0

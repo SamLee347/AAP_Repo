@@ -406,14 +406,14 @@ def categorize_item():
             'Other': "Other"
         }
         
-        # Create fallback mapping based on prediction index for main categories
+        # Create fallback mapping based on prediction index
         prediction_index_to_category = {
-            0: "Technology",           # Maps to label '0'
-            1: "Clothing",            # Maps to label '3'  
-            2: "Sports and Fitness",  # Maps to label '5'
-            3: "Other",               # Maps to label '6' <- This includes Book Shop, Pet Shop, etc.
-            4: "Technology",          # Maps to label '8'
-            5: "Other"                # Maps to label 'Other'
+            0: "Technology",    # Maps to label '0'
+            1: "Clothing",      # Maps to label '3'  
+            2: "Sports",        # Maps to label '5'
+            3: "Books",         # Maps to label '6' <- This is your case!
+            4: "Electronics",   # Maps to label '8'
+            5: "Other"          # Maps to label 'Other'
         }
         
         try:
