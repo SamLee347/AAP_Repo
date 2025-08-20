@@ -10,12 +10,12 @@ def populate_test_data():
     session.query(Inventory).delete()
 
     # Create Inventory test items
-    electronics = Inventory(
+    technology = Inventory(
         ItemId=101,
         ItemName="Cool Gadget",
         Date="2025-06-01",
         ItemQuantity=100,
-        ItemCategory="Electronics",
+        ItemCategory="Technology",
         UnitsSold=50,
         Weight=1.5,
         Size="Small",

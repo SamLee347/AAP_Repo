@@ -161,7 +161,6 @@ export function AIPanel({ selectedItem }: AIPanelProps) {
                         </div>
                       </div>
                     )}
-                    // In your AIPanel component, update the categorization section:
                     {tab.id === "category" && (
                       <>
                         <span className="badge badge-outline mb-2">
