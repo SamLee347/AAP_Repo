@@ -363,7 +363,6 @@ def calculate_live_features(item, orders):
         'order_count': len(orders)
     }
 
-
 @app.route('/categorization', methods=["POST"])
 def categorize_item():
     data = request.json
