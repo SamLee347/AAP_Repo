@@ -10,12 +10,12 @@ def populate_test_data():
     session.query(Inventory).delete()
 
     # Create Inventory test items
-    electronics = Inventory(
+    technology = Inventory(
         ItemId=101,
         ItemName="Cool Gadget",
         Date="2025-06-01",
         ItemQuantity=100,
-        ItemCategory="Electronics",
+        ItemCategory="Technology",
         UnitsSold=50,
         Weight=1.5,
         Size="Small",
@@ -46,12 +46,27 @@ def populate_test_data():
         Date="2025-08-01",
         ItemQuantity=150,
         ItemCategory="Clothing",
+        UnitsSold=3000,
+        Weight=15.0,
+        Size="Large",
+        Priority="Low",
+        DemandForecast=2000,  # Example lag feature
+        Dispose=True,
+        Location="C-6",
+    )
+
+    Big = Inventory(
+        ItemId=104,
+        ItemName="Cool Clothes",
+        Date="2025-08-01",
+        ItemQuantity=3000,
+        ItemCategory="Clothing",
         UnitsSold=75,
         Weight=15.0,
         Size="Large",
         Priority="Low",
-        DemandForecast=20,  # Example lag feature
-        Dispose=True,
+        DemandForecast=100,  # Example lag feature
+        Dispose=False,
         Location="C-6",
     )
 
@@ -96,7 +111,7 @@ def populate_test_data():
     ]
 
     # Add to session and commit
-    session.add_all([electronics, clothing, Clothes])
+    session.add_all([electronics, clothing, Clothes, Big])
     session.add_all(orders)
     session.commit()
     session.close()
