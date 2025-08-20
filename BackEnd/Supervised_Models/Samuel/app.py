@@ -15,7 +15,7 @@ with open('storage_prediction_model.pkl', 'rb') as file:
 # Replace these with your actual categorical features and their values
 categorical_features = {
     'Priority': ['High','Low','Medium'],
-    'Product_Type': ['Clothing','Electronics','Home Goods','Sports'],
+    'Product_Type': ['Clothing','Technology','Other','Sports and Fitness'],
     'Size': ['Large','Medium','Small']
 }
 
